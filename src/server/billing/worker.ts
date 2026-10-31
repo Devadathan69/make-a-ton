@@ -53,6 +53,8 @@ export async function runDueBilling(asOf:string,limit=100):Promise<BillingRunRes
             if(!reserved.rowCount)throw new HttpError(409,'DISCOUNT_EXHAUSTED','Discount cap was reached');
             await db.query('INSERT INTO discount_redemptions(discount_id,invoice_id) VALUES($1,$2)',[ruleId,invoiceId]);
           }
+          // Persist the outbox with the invoice; SMTP processing happens after commit.
+          await db.query("INSERT INTO outbox_messages(id,dedupe_key,kind,payload) VALUES($1,$2,'INVOICE',$3)",[randomUUID(),`invoice:${invoiceId}`,{invoiceId,to:customerSnapshot.email}]);
           await audit(db,null,'invoice',invoiceId,'issued',{runId,periodStart:period,periodEnd:end});
           await db.query('UPDATE subscriptions SET next_billing_date=$1,updated_at=now() WHERE id=$2',[end,row.id]);
           await db.query('UPDATE billing_failures SET resolved_at=now() WHERE subscription_id=$1 AND period_start=$2 AND resolved_at IS NULL',[row.id,period]);

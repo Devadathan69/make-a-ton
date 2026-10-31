@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Product, Plan, TaxRule, Customer, QuoteTemplate, Subscription } from '@/lib/contracts';
 import { isolatedDatabase } from './test-db';
+import { runDueBilling } from './billing/worker';
+import { deliverOutbox } from './outbox';
 import { handle } from './router';
 import { digest } from './auth';
 
@@ -8,6 +10,7 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
   let fixture:Awaited<ReturnType<typeof isolatedDatabase>>;
   let product:Product,plan:Plan,tax:TaxRule,customer:Customer,template:QuoteTemplate;
   let subscription:Subscription;
+  let invoiceId:string;
   const token='a'.repeat(64),cookie=`ll_session=${token}`;
   const call=async(path:string,method='GET',input?:unknown,session=cookie,headers:Record<string,string>={})=>handle(new Request(`http://localhost:3000/api/v1/${path}`,{method,headers:{origin:'http://localhost:3000','Content-Type':'application/json','X-LoopLedger-CSRF':'1',cookie:session,...headers},...(input===undefined?{}:{body:JSON.stringify(input)})}),path.split('?')[0].split('/'));
   async function create<T>(path:string,input:unknown):Promise<T>{const res=await call(path,'POST',input);expect(res.status,await res.clone().text()).toBe(201);return res.json();}
@@ -80,6 +83,57 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     const locked:Subscription=await create('subscriptions',{...draft,planId:restricted.id,startDate:'2026-10-01',expiryDate:'2027-10-01'});
     for(const action of ['quote','confirm','activate'])expect((await call(`subscriptions/${locked.id}/transition`,'POST',{action})).status).toBe(200);
     expect((await call(`subscriptions/${locked.id}/transition`,'POST',{action:'pause'})).status).toBe(409);
+  });
+
+  it('issues authorized printable snapshot documents and isolates both customers on every route',async()=>{
+    expect((await runDueBilling('2026-10-01')).failed).toBe(0);
+    invoiceId=(await fixture.db.query('SELECT id FROM invoices WHERE subscription_id=$1',[subscription.id])).rows[0].id;
+    const invoice=await (await call(`invoices/${invoiceId}`)).json();expect(invoice.total).toBe(990000);expect(invoice.emailStatus).toBe('QUEUED');
+    const original=await (await call(`invoices/${invoiceId}/document`)).text();
+    await call(`products/${product.id}`,'PATCH',{name:'Changed later',salesPrice:300000});await call(`customers/${customer.id}`,'PATCH',{company:'Changed later'});
+    expect(await (await call(`invoices/${invoiceId}/document`)).text()).toBe(original);
+    const a=`ll_session=${'b'.repeat(64)}`;
+    expect((await call(`invoices/${invoiceId}/document`,'GET',undefined,a)).status).toBe(200);
+    const other=await create<Customer>('customers',{name:'Other',email:'other@example.test',company:'Other',address:'<script>alert(1)</script>'});
+    await fixture.db.query("INSERT INTO users(id,name,email,password_hash,role,customer_id) VALUES('other','Other','other-login@example.test','unused','CUSTOMER',$1)",[other.id]);
+    await fixture.db.query("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,'other',now()+interval '1 day')",[digest('c'.repeat(64))]);
+    const b=`ll_session=${'c'.repeat(64)}`;
+    for(const path of [`invoices/${invoiceId}`,`invoices/${invoiceId}/document`,`portal/invoices/${invoiceId}`,`portal/invoices/${invoiceId}/document`,`portal/subscriptions/${subscription.id}`])expect((await call(path,'GET',undefined,b)).status).toBe(404);
+    expect((await call(`portal/subscriptions/${subscription.id}/transition`,'POST',{action:'pause'},b)).status).toBe(404);
+    const owned=await (await call(`portal/invoices?customerId=${customer.id}`,'GET',undefined,b)).json();expect(owned.total).toBe(0);
+    expect((await call(`invoices/${invoiceId}/actions`,'POST',{action:'cancel'},a)).status).toBe(403);
+    expect((await call(`invoices/${invoiceId}/document`,'GET',undefined,'')).status).toBe(401);
+  });
+  it('deduplicates queued email, exposes retry failure, and processes accepted sends once without external SMTP',async()=>{
+    for(let i=0;i<2;i++)expect((await call(`invoices/${invoiceId}/actions`,'POST',{action:'send'})).status).toBe(200);
+    expect((await fixture.db.query('SELECT count(*) FROM outbox_messages WHERE dedupe_key=$1',[`invoice:${invoiceId}`])).rows[0].count).toBe('1');
+    const failed=await deliverOutbox(async()=>{throw new Error('Simulated SMTP unavailable');});expect(failed.failed).toBeGreaterThan(0);
+    expect((await (await call(`invoices/${invoiceId}`)).json()).emailStatus).toBe('FAILED');
+    await call(`invoices/${invoiceId}/actions`,'POST',{action:'send'});
+    let sent=0;const results=await Promise.all([deliverOutbox(async m=>{expect(m.to).toBe('business@example.test');expect(m.html).toContain('9,900.00');sent++;}),deliverOutbox(async()=>{sent++;})]);
+    expect(results.reduce((n,r)=>n+r.sent,0)).toBe(1);expect(sent).toBe(1);
+    await call(`invoices/${invoiceId}/actions`,'POST',{action:'send'});expect((await deliverOutbox(async()=>{sent++;})).sent).toBe(0);expect(sent).toBe(1);
+    expect((await (await call(`invoices/${invoiceId}`)).json()).emailStatus).toBe('SENT');
+  });
+  it('cancels only unpaid issued invoices and releases discount usage once, preserving period history',async()=>{
+    const before=(await fixture.db.query('SELECT usage_count FROM discounts')).rows[0].usage_count;
+    expect((await call(`invoices/${invoiceId}/actions`,'POST',{action:'cancel'})).status).toBe(200);
+    expect((await fixture.db.query('SELECT usage_count FROM discounts')).rows[0].usage_count).toBe(before-1);
+    expect((await call(`invoices/${invoiceId}/actions`,'POST',{action:'cancel'})).status).toBe(409);
+    expect((await fixture.db.query('SELECT usage_count FROM discounts')).rows[0].usage_count).toBe(before-1);
+    expect((await fixture.db.query('SELECT count(*) FROM invoices WHERE id=$1',[invoiceId])).rows[0].count).toBe('1');
+  });
+
+  it('confirms draft invoices and marks zero-total invoices paid without a payment row',async()=>{
+    for(const [id,year,zero] of [['settlement',2028,false],['zero',2029,true]] as const) {
+      await fixture.db.query(`INSERT INTO invoices(id,number,subscription_id,customer_id,customer_snapshot,status,issued_at,due_at,period_start,period_end,subtotal,discount,tax,total,paid,explanation)
+        SELECT $1,$1,subscription_id,customer_id,customer_snapshot,'DRAFT',issued_at,due_at,$2,$3,CASE WHEN $4 THEN 0 ELSE subtotal END,CASE WHEN $4 THEN 0 ELSE discount END,CASE WHEN $4 THEN 0 ELSE tax END,CASE WHEN $4 THEN 0 ELSE total END,0,explanation FROM invoices WHERE id=$5`,[id,`${year}-10-01`,`${year}-11-01`,zero,invoiceId]);
+      await fixture.db.query(`INSERT INTO invoice_lines(id,invoice_id,description,quantity,unit_price,subtotal,discount,tax,total,pricing_snapshot)
+        SELECT $1||id,$1,description,quantity,CASE WHEN $2 THEN 0 ELSE unit_price END,CASE WHEN $2 THEN 0 ELSE subtotal END,CASE WHEN $2 THEN 0 ELSE discount END,CASE WHEN $2 THEN 0 ELSE tax END,CASE WHEN $2 THEN 0 ELSE total END,pricing_snapshot FROM invoice_lines WHERE invoice_id=$3`,[id,zero,invoiceId]);
+      const res=await call(`invoices/${id}/actions`,'POST',{action:'confirm'});expect(res.status).toBe(200);expect((await res.json()).status).toBe(zero?'PAID':'CONFIRMED');
+    }
+    expect((await fixture.db.query("SELECT count(*) FROM payments WHERE invoice_id='zero'")).rows[0].count).toBe('0');
+    invoiceId='settlement';
   });
 
 });
