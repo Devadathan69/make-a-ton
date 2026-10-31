@@ -1,0 +1,380 @@
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filterInput {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 12px;
+  min-width: 140px;
+}
+
+.filterCheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  padding-bottom: 8px;
+}
+
+.filterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paginationButton {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: all 0.15s;
+}
+
+.paginationButton:hover:not(:disabled) {
+  background: var(--canvas);
+  border-color: #85b397;
+}
+
+.rowClickable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.rowClickable:hover {
+  background: #f7f9f6;
+}
+
+.badgeRow {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.badgeOverdue {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #fdf0ed;
+  color: #a14536;
+  border: 1px solid #f2ceca;
+}
+
+.badgePartial {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #eef4fb;
+  color: #3b6b99;
+  border: 1px solid #cfe0f3;
+}
+
+/* Modal Drawer Overlay */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 46, 41, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawerContent {
+  width: 100%;
+  max-width: 680px;
+  height: 100vh;
+  background: var(--surface);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  animation: slideIn 0.25s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawerHeader {
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 10;
+}
+
+.drawerTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawerClose {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+
+.drawerClose:hover {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.drawerBody {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex: 1;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--canvas);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metaLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+.metaValue {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lifecycleNotice {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #f7f9f6;
+  border: 1px solid #e2e8e0;
+  color: #3b5046;
+}
+
+.linesTableWrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.totalsCard {
+  background: #fbfcfa;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+}
+
+.totalRowGrand {
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.totalRowPaid {
+  color: #33784b;
+}
+
+.totalRowBalance {
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 14px;
+  font-weight: 700;
+  color: #a14536;
+}
+
+.explanationBox {
+  background: #fdfdfc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.explanationList {
+  margin: 10px 0 0 16px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #4a5954;
+}
+
+.actionBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.alertBox {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.alertError {
+  background: #fff2ef;
+  border: 1px solid #f2ceca;
+  color: #a14536;
+}
+
+.alertSuccess {
+  background: #eef7f1;
+  border: 1px solid #c9e6d2;
+  color: #2b6e41;
+}
+
+.alertInfo {
+  background: #f4eddb;
+  border: 1px solid #e7dcc2;
+  color: #6f603b;
+}
+
+/* Confirmation Dialog */
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.dialogCard {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.buttonDanger {
+  background: #a14536;
+  border: 1px solid #a14536;
+  color: white;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.buttonDanger:hover:not(:disabled) {
+  background: #8b372a;
+}
