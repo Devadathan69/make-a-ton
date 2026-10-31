@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { Subscription, SubscriptionAction, SubscriptionInput, User, Invoice, DiscountRule } from '@/lib/contracts';
+import type { Subscription, SubscriptionAction, SubscriptionInput, User, Invoice, DiscountRule, BillingInterval } from '@/lib/contracts';
 import { getPool, one, transaction, type Db } from './db';
-import { getResource, validateLines, validateReferences } from './catalog';
+import { getResource, getResourcesByIds, validateLines, validateReferences } from './catalog';
 import { checkOrigin, requireUser } from './auth';
 import { body, HttpError, missing } from './errors';
 import { dateOnly, lineInput, listQuery, planSnapshot, safeInteger, taxSnapshot, timestamps } from './values';
@@ -11,22 +11,21 @@ import { addDays, isBoundary, nextCycle } from './dates';
 import { calculate, type BillingLine } from './billing/calculator';
 const inputSchema=z.object({customerId:z.string().min(1),planId:z.string().min(1),templateId:z.string().optional(),startDate:dateOnly,expiryDate:dateOnly.nullable(),paymentTermsDays:z.number().int().min(0).max(3650),quotationValidUntil:dateOnly.nullable(),lines:z.array(lineInput.strict()).max(100)}).strict();
 export interface SubscriptionRow {
-  id:string;number:string;customer_id:string;plan_id:string;template_id:string|null;status:Subscription['status'];start_date:string;expiry_date:string|null;next_billing_date:string|null;payment_terms_days:number;quotation_valid_until:string|null;plan_snapshot:unknown;cycle_anchor:string|null;created_at:Date;updated_at:Date;customer_name:string;plan_name:string;
+  id:string;number:string;customer_id:string;plan_id:string;template_id:string|null;status:Subscription['status'];start_date:string;expiry_date:string|null;next_billing_date:string|null;payment_terms_days:number;quotation_valid_until:string|null;plan_snapshot:unknown;cycle_anchor:string|null;created_at:Date;updated_at:Date;customer_name:string;plan_name:string;plan_price:string;plan_interval:BillingInterval;plan_auto_close:boolean;plan_allow_early_close:boolean;plan_allow_pause:boolean;plan_allow_renew:boolean;
 }
 interface LineRow {id:string;product_id:string;variant_id:string|null;description:string;quantity:number;unit_price:string;tax_ids:string[];tax_snapshot:unknown;pricing_snapshot:unknown}
-export const subscriptionSelect=`SELECT s.*,c.company customer_name,p.name plan_name FROM subscriptions s JOIN customers c ON c.id=s.customer_id JOIN plans p ON p.id=s.plan_id`;
+export const subscriptionSelect=`SELECT s.*,c.company customer_name,p.name plan_name,p.price plan_price,p.interval plan_interval,p.auto_close plan_auto_close,p.allow_early_close plan_allow_early_close,p.allow_pause plan_allow_pause,p.allow_renew plan_allow_renew FROM subscriptions s JOIN customers c ON c.id=s.customer_id JOIN plans p ON p.id=s.plan_id`;
 export async function subscriptionRow(db:Db,id:string,user?:User,lock=false) {
   const row=await one<SubscriptionRow>(db,`${subscriptionSelect} WHERE s.id=$1${user?.role==='CUSTOMER'?' AND s.customer_id=$2':''}${lock?' FOR UPDATE OF s':''}`,[id,...(user?.role==='CUSTOMER'?[user.customerId]:[])]);
   if(!row)throw missing();return row;
 }
 export async function subscriptionLines(db:Db,id:string){return (await db.query<LineRow>('SELECT * FROM subscription_lines WHERE subscription_id=$1 ORDER BY id',[id])).rows;}
-async function policy(db:Db,row:SubscriptionRow) {
+function policy(row:SubscriptionRow) {
   if(row.plan_snapshot)return planSnapshot.parse(row.plan_snapshot);
-  const p=await getResource(db,'plans',row.plan_id);
-  return {name:p.name,price:p.price,interval:p.interval,autoClose:p.autoClose,allowEarlyClose:p.allowEarlyClose,allowPause:p.allowPause,allowRenew:p.allowRenew,taxes:[]};
+  return {name:row.plan_name,price:safeInteger(row.plan_price),interval:row.plan_interval,autoClose:row.plan_auto_close,allowEarlyClose:row.plan_allow_early_close,allowPause:row.plan_allow_pause,allowRenew:row.plan_allow_renew,taxes:[]};
 }
 export async function allowedActions(db:Db,row:SubscriptionRow,user:User,asOf:string):Promise<SubscriptionAction[]> {
-  const p=await policy(db,row),internal=user.role!=='CUSTOMER';
+  const p=policy(row),internal=user.role!=='CUSTOMER';
   if(row.status==='DRAFT')return internal?['quote']:[];
   if(row.status==='QUOTATION')return internal&&!!row.quotation_valid_until&&row.quotation_valid_until>=asOf?['confirm']:[];
   const actions:SubscriptionAction[]=[];
@@ -39,7 +38,7 @@ export async function allowedActions(db:Db,row:SubscriptionRow,user:User,asOf:st
   return actions;
 }
 export async function subscriptionDto(db:Db,row:SubscriptionRow,user:User,asOf:string,lines?:LineRow[]):Promise<Subscription> {
-  const p=await policy(db,row);
+  const p=policy(row);
   return {id:row.id,...timestamps(row),number:row.number,customerId:row.customer_id,customerName:row.customer_name,planId:row.plan_id,planName:p.name,status:row.status,startDate:row.start_date,expiryDate:row.expiry_date,nextBillingDate:row.next_billing_date,paymentTermsDays:row.payment_terms_days,quotationValidUntil:row.quotation_valid_until,allowedActions:await allowedActions(db,row,user,asOf),lines:(lines??await subscriptionLines(db,row.id)).map(l=>({id:l.id,productId:l.product_id,variantId:l.variant_id,quantity:l.quantity,taxIds:z.array(z.string()).parse(l.tax_ids),description:l.description,unitPrice:safeInteger(l.unit_price),subtotal:safeInteger(BigInt(l.unit_price)*BigInt(l.quantity))}))};
 }
 export async function resolveEconomics(db:Db,input:SubscriptionInput) {
@@ -52,13 +51,17 @@ export async function resolveEconomics(db:Db,input:SubscriptionInput) {
   if(input.startDate<p.availableFrom||(p.availableUntil&&input.startDate>p.availableUntil))throw new HttpError(422,'VALIDATION_ERROR','Start date is outside plan availability',{startDate:'Choose an available date'});
   if(input.lines.reduce((n,l)=>n+l.quantity,0)<p.minimumQuantity)throw new HttpError(422,'VALIDATION_ERROR','Minimum quantity is not met',{'lines':'Increase quantity'});
   if(input.expiryDate&&(input.expiryDate<=input.startDate||!isBoundary(input.startDate,input.expiryDate,p.interval)))throw new HttpError(422,'OFF_CYCLE_EXPIRY','MVP expiry must fall on a billing boundary; proration is not supported',{expiryDate:'Choose a billing boundary'});
-  const taxes=async(ids:string[])=>{await validateReferences(db,'taxes',ids,'taxIds',true);return Promise.all(ids.map(async id=>{const t=await getResource(db,'taxes',id);return {id:t.id,name:t.name,rateBps:t.rateBps};}));};
-  const plan={name:p.name,price:p.price,interval:p.interval,autoClose:p.autoClose,allowEarlyClose:p.allowEarlyClose,allowPause:p.allowPause,allowRenew:p.allowRenew,taxes:await taxes(p.taxIds)};
+  await validateReferences(db,'taxes',p.taxIds,'taxIds',true);
+  const referencedTaxes=await getResourcesByIds(db,'taxes',[...p.taxIds,...input.lines.flatMap(l=>l.taxIds)]);
+  const taxMap=new Map(referencedTaxes.map(t=>[t.id,{id:t.id,name:t.name,rateBps:t.rateBps}]));
+  const taxes=(ids:string[])=>ids.map(id=>taxMap.get(id)!);
+  const products=new Map((await getResourcesByIds(db,'products',input.lines.map(l=>l.productId))).map(product=>[product.id,product]));
+  const plan={name:p.name,price:p.price,interval:p.interval,autoClose:p.autoClose,allowEarlyClose:p.allowEarlyClose,allowPause:p.allowPause,allowRenew:p.allowRenew,taxes:taxes(p.taxIds)};
   const lines=[];
   for(const l of input.lines) {
-    const product=await getResource(db,'products',l.productId),variant=product.variants.find(v=>v.id===l.variantId);
+    const product=products.get(l.productId)!,variant=product.variants.find(v=>v.id===l.variantId);
     const unitPrice=bounded(BigInt(product.salesPrice)+BigInt(variant?.priceAdjustment??0));bounded(BigInt(unitPrice)*BigInt(l.quantity));
-    lines.push({...l,description:product.name+(variant?` / ${variant.name}`:''),unitPrice,taxes:await taxes(l.taxIds),pricing:{product:{id:product.id,name:product.name,notes:product.notes,salesPrice:product.salesPrice},variant:variant??null}});
+    lines.push({...l,description:product.name+(variant?` / ${variant.name}`:''),unitPrice,taxes:taxes(l.taxIds),pricing:{product:{id:product.id,name:product.name,notes:product.notes,salesPrice:product.salesPrice},variant:variant??null}});
   }
   bounded(lines.reduce((n,l)=>n+BigInt(l.unitPrice)*BigInt(l.quantity),BigInt(plan.price)));
   try {
@@ -99,7 +102,7 @@ export async function saveSubscription(user:User,input:unknown,id?:string) {
 }
 export async function transition(user:User,id:string,action:SubscriptionAction,startDate?:string) {
   return transaction(async db=>{
-    const row=await subscriptionRow(db,id,user,true),asOf=await effectiveDate(db),p=await policy(db,row);
+    const row=await subscriptionRow(db,id,user,true),asOf=await effectiveDate(db),p=policy(row);
     const closedRenew=row.status==='CLOSED'&&action==='renew'&&p.allowRenew&&startDate&&startDate>asOf;
     if(!(await allowedActions(db,row,user,asOf)).includes(action)&&!closedRenew)throw new HttpError(409,'INVALID_TRANSITION','This action is not available for this status, date or policy');
     if(['pause','close','resume'].includes(action)&&row.next_billing_date&&row.next_billing_date<asOf)throw new HttpError(422,'BILLING_CATCH_UP_REQUIRED','Run due billing before changing this subscription');
@@ -126,7 +129,7 @@ export async function transition(user:User,id:string,action:SubscriptionAction,s
   });
 }
 export async function billingInputs(db:Db,row:SubscriptionRow) {
-  const p=await policy(db,row),stored=await subscriptionLines(db,row.id);
+  const p=policy(row),stored=await subscriptionLines(db,row.id);
   let lines:BillingLine[]=stored.map(l=>({id:l.id,productId:l.product_id,description:l.description,quantity:l.quantity,unitPrice:safeInteger(l.unit_price),taxes:taxSnapshot.parse(l.tax_snapshot)}));
   if(!row.plan_snapshot){const dto=await resolveEconomics(db,{customerId:row.customer_id,planId:row.plan_id,startDate:row.start_date,expiryDate:row.expiry_date,paymentTermsDays:row.payment_terms_days,quotationValidUntil:row.quotation_valid_until,lines:stored.map(l=>({productId:l.product_id,variantId:l.variant_id,quantity:l.quantity,taxIds:l.tax_ids}))});lines=dto.lines.map((l,i)=>({id:stored[i].id,productId:l.productId,description:l.description,quantity:l.quantity,unitPrice:l.unitPrice,taxes:l.taxes}));p.taxes=dto.plan.taxes;}
   if(p.price||p.taxes.length)lines.push({id:`base_${row.id}`,productId:null,description:`${p.name} base fee`,quantity:1,unitPrice:p.price,taxes:p.taxes});
@@ -134,7 +137,7 @@ export async function billingInputs(db:Db,row:SubscriptionRow) {
 }
 export async function discountRules(db:Db,lock=false):Promise<DiscountRule[]> {
   const rows=(await db.query(`SELECT id FROM discounts ORDER BY id${lock?' FOR UPDATE':''}`)).rows;
-  return Promise.all(rows.map(r=>getResource(db,'discounts',r.id)));
+  return getResourcesByIds(db,'discounts',rows.map(r=>r.id));
 }
 export async function preview(user:User,id:string):Promise<Invoice> {
   const db=getPool(),row=await subscriptionRow(db,id,user),asOf=await effectiveDate(db),input=await billingInputs(db,row),period=row.next_billing_date??row.start_date;

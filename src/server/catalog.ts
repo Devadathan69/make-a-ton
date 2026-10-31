@@ -43,6 +43,12 @@ function dto<R extends Resource>(resource:R,row:Record<string,unknown>):Resource
 export async function getResource<R extends Resource>(db:Db,resource:R,id:string):Promise<ResourceTypes[R]> {
   const row=await one(db,`${selection(resource)} WHERE r.id=$1`,[id]);if(!row) throw missing();return dto(resource,row);
 }
+/** One bounded catalog read for a set of references; avoids per-line service queries. */
+export async function getResourcesByIds<R extends Resource>(db:Db,resource:R,ids:string[]):Promise<ResourceTypes[R][]> {
+  if(!ids.length)return [];
+  const rows=(await db.query(`${selection(resource)} WHERE r.id=ANY($1::text[]) ORDER BY r.id`,[[...new Set(ids)]])).rows;
+  return rows.map(row=>dto(resource,row));
+}
 export async function validateReferences(db:Db,table:'products'|'taxes'|'plans'|'customers',values:string[],field:string,active=false) {
   const unique=[...new Set(values)];if(!unique.length)return;
   const rows=(await db.query(`SELECT id${table==='customers'?'':',active'} FROM ${table} WHERE id=ANY($1::text[]) FOR SHARE`,[unique])).rows;

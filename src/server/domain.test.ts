@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Product, Plan, TaxRule, Customer, QuoteTemplate, Subscription } from '@/lib/contracts';
+import { getPool } from './db';
 import { isolatedDatabase } from './test-db';
 import { runDueBilling } from './billing/worker';
 import { deliverOutbox } from './outbox';
@@ -206,6 +207,20 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     expect((await call(`outbox/${entry.id}/retry`,'POST',{confirmUnknownDelivery:false})).status).toBe(409);
     expect((await call(`outbox/${entry.id}/retry`,'POST',{confirmUnknownDelivery:true})).status).toBe(200);
     expect((await deliverOutbox(async()=>{})).sent).toBe(1);
+  });
+
+  it('keeps draft list reads bounded as page size grows, using joined plan policies',async()=>{
+    await fixture.db.query(`INSERT INTO subscriptions(id,number,customer_id,plan_id,status,start_date,payment_terms_days)
+      SELECT 'pageperf_'||n,'PAGEPERF-'||n,$1,$2,'DRAFT','2026-11-01',14 FROM generate_series(1,20) n`,[customer.id,plan.id]);
+    await fixture.db.query(`INSERT INTO subscription_lines(id,subscription_id,product_id,description,quantity,unit_price)
+      SELECT 'pageperf_line_'||n,'pageperf_'||n,$1,'Workspace',1,100000 FROM generate_series(1,20) n`,[product.id]);
+    const queries=vi.spyOn(getPool(),'query');
+    try {
+      const first=await (await call('subscriptions?search=PAGEPERF&pageSize=1')).json();const singleCount=queries.mock.calls.length;queries.mockClear();
+      const full=await (await call('subscriptions?search=PAGEPERF&pageSize=20')).json();
+      expect(first.total).toBe(20);expect(full.items).toHaveLength(20);expect(full.items.every((s:Subscription)=>s.allowedActions.includes('quote'))).toBe(true);
+      expect(queries.mock.calls.length).toBe(singleCount);expect(singleCount).toBeLessThanOrEqual(8);
+    } finally {queries.mockRestore();}
   });
 
 });
