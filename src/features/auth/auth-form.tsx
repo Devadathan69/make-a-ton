@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import styles from './auth.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { request } from '@/lib/api/http';
+import { request, ApiError } from '@/lib/api/http';
 import type { Session } from '@/lib/contracts';
 type Mode='login'|'register'|'forgot-password'|'reset-password';
 const titles:Record<Mode,string>={login:'Sign in',register:'Create customer account','forgot-password':'Reset your password','reset-password':'Choose a new password'};
@@ -18,7 +18,7 @@ export function AuthForm({mode}:{mode:Mode}) {
       const result=await request<Session&{message?:string}>(`/auth/${mode}`,'POST',values);
       if(result.user) {router.replace(result.user.role==='CUSTOMER'?'/portal':'/dashboard');router.refresh();}
       else {setMessage(result.message??'Completed');if(mode==='reset-password') window.history.replaceState(null,'','/reset-password');}
-    } catch(err) {setError(err instanceof Error?err.message:'Request failed');}finally{setBusy(false);}
+    } catch(err) {setError(err instanceof ApiError&&err.fields?Object.values(err.fields).join(' '):err instanceof Error?err.message:'Request failed');}finally{setBusy(false);}
   }
   return <section className={styles.card}><h1>{titles[mode]}</h1><form onSubmit={submit}>
     {mode==='register'&&<p><label>Name<input required name="name" autoComplete="name" maxLength={100}/></label></p>}

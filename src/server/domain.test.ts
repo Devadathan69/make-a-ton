@@ -38,6 +38,13 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     expect((await call(`discounts`,'POST',{name:'Wrong',kind:'PERCENTAGE',value:10001,scope:'SUBSCRIPTION',productIds:[],minimumPurchase:0,minimumQuantity:1,startsAt:'2026-01-01',endsAt:null,usageLimit:null,active:true})).status).toBe(400);
   });
 
+
+  it('filters audit creation timestamps by Asia/Kolkata calendar boundaries',async()=>{
+    const times=['2026-10-30T18:29:59Z','2026-10-30T18:30:00Z','2026-10-31T18:29:59Z','2026-10-31T18:30:00Z'];
+    for(let n=0;n<times.length;n++)await fixture.db.query('INSERT INTO customers(id,name,email,company,created_at) VALUES($1,$2,$3,$2,$4)',[`zone_${n}`,'KOLKATA-DATE-BOUNDARY',`boundary-${n}@example.test`,times[n]]);
+    const response=await call('customers?search=KOLKATA-DATE-BOUNDARY&from=2026-10-31&to=2026-10-31');expect(response.status).toBe(200);
+    const page=await response.json();expect(page.total).toBe(2);expect(page.items.map((c:Customer)=>c.id)).toEqual(['zone_2','zone_1']);
+  });
   it('rejects unsafe contract aggregates including adjusted prices and taxes with field errors',async()=>{
     const huge=await create<Product>('products',{name:'Maximum test amount',type:'SERVICE',salesPrice:Number.MAX_SAFE_INTEGER,costPrice:0,notes:'Fictitious limit test',active:true,variants:[{name:'Adjustment',priceAdjustment:1}]});
     const draft={customerId:customer.id,planId:plan.id,startDate:'2026-10-01',expiryDate:null,paymentTermsDays:14,quotationValidUntil:null};
@@ -194,7 +201,7 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     process.env.CRON_SECRET='fictitious-test-credential-'.repeat(2);
     expect((await call('scheduler/run','POST',{},'',{authorization:'Bearer incorrect'})).status).toBe(401);
     const headers={authorization:`Bearer ${process.env.CRON_SECRET}`};
-    expect((await call('scheduler/run','POST',{},'',headers)).status).toBe(200);
+    expect((await call('scheduler/run','GET',undefined,'',headers)).status).toBe(200);
     expect((await call('scheduler/run','POST',{},'',headers)).status).toBe(429);
   });
   it('holds uncertain SMTP acceptance for explicit reconciliation and exposes only safe outbox metadata',async()=>{
@@ -209,6 +216,22 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     expect((await deliverOutbox(async()=>{})).sent).toBe(1);
   });
 
+
+  it('targets immediate invoice delivery after response without draining another invoice first',async()=>{
+    const pending=(await fixture.db.query("SELECT id FROM invoices WHERE status='CONFIRMED' ORDER BY id LIMIT 1")).rows[0].id;
+    const tasks:(()=>Promise<void>)[]=[];let sends=0;
+    vi.stubEnv('EMAIL_DELIVERY_ENABLED','true');
+    try {
+      const path=`invoices/${pending}/actions`;
+      const request=new Request(`http://localhost:3000/api/v1/${path}`,{method:'POST',headers:{origin:'http://localhost:3000','Content-Type':'application/json','X-LoopLedger-CSRF':'1',cookie},body:JSON.stringify({action:'send'})});
+      // Requeue only a known failed state for this delivery test.
+      await fixture.db.query("UPDATE outbox_messages SET delivery_state='FAILED',next_attempt_at=now(),sent_at=NULL WHERE dedupe_key=$1",[`invoice:${pending}`]);
+      const response=await handle(request,path.split('/'),{defer:task=>tasks.push(task),dispatch:key=>deliverOutbox(async()=>{sends++;},1,key)});
+      expect(response.status).toBe(200);expect(tasks).toHaveLength(1);expect(sends).toBe(0);
+      await tasks[0]();expect(sends).toBe(1);
+      expect((await fixture.db.query('SELECT delivery_state FROM outbox_messages WHERE dedupe_key=$1',[`invoice:${pending}`])).rows[0].delivery_state).toBe('SENT');
+    } finally {vi.unstubAllEnvs();}
+  });
   it('keeps draft list reads bounded as page size grows, using joined plan policies',async()=>{
     await fixture.db.query(`INSERT INTO subscriptions(id,number,customer_id,plan_id,status,start_date,payment_terms_days)
       SELECT 'pageperf_'||n,'PAGEPERF-'||n,$1,$2,'DRAFT','2026-11-01',14 FROM generate_series(1,20) n`,[customer.id,plan.id]);

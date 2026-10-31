@@ -63,4 +63,11 @@ describe.skipIf(!process.env.DB_TEST_URL)('transactional recurring billing',()=>
     const report=await reportSummary();expect(report.activeSubscriptions).toBe(4);expect(report.mrr).toBe(36);
   });
 
+  it('leaves due work intact when the invocation budget is exhausted',async()=>{
+    await subscription('budget');
+    const result=await runDueBilling('2026-01-31',500,0);expect(result.generated).toBe(0);expect(result.remainingDue).toBe(1);
+    expect((await fixture.db.query('SELECT next_billing_date::text FROM subscriptions')).rows[0].next_billing_date).toBe('2026-01-31');
+    expect((await runDueBilling('2026-01-31')).remainingDue).toBe(0);
+  });
+
 });

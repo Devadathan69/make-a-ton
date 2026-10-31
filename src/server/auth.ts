@@ -50,7 +50,7 @@ export function encryptResetPayload(payload:unknown) {
   return {iv:iv.toString('hex'),data:data.toString('hex'),tag:cipher.getAuthTag().toString('hex')};
 }
 const dummyHash=hashPassword('Dummy!Comparison');
-export async function authRoute(request:Request,action:string):Promise<Response> {
+export async function authRoute(request:Request,action:string,onQueued?:(key:string|null)=>void):Promise<Response> {
   if(request.method!=='POST') throw new HttpError(405,'METHOD_NOT_ALLOWED','Use POST');
   checkOrigin(request);
   if(action==='logout') {
@@ -91,18 +91,22 @@ export async function authRoute(request:Request,action:string):Promise<Response>
     await throttle(`reset:${digest(data.email)}`,5);
     // Check configuration before lookup so availability does not reveal account existence.
     encryptResetPayload({});
+    let queuedKey:string|null=null;
     await transaction(async db=>{
       const row=await findUserByEmail(db,data.email);
       if(!row) return;
       const token=randomBytes(32).toString('hex'),hash=digest(token);
       await db.query("INSERT INTO password_resets(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')",[hash,row.id]);
+      queuedKey=`reset:${hash}`;
       const payload=encryptResetPayload({to:row.email,url:`${new URL('/reset-password',process.env.APP_URL).href}#token=${token}`});
       await db.query("INSERT INTO outbox_messages(id,dedupe_key,kind,payload) VALUES($1,$2,'PASSWORD_RESET',$3)",[randomUUID(),`reset:${hash}`,payload]);
     });
+    // Called for both known and unknown accounts; provider work is outside response latency.
+    onQueued?.(queuedKey);
     return Response.json({message:'If that account exists, a reset email has been queued.'},{status:202});
   }
   if(action==='reset-password') {
-    const data=z.object({token:z.string().regex(/^[a-f0-9]{64}$/),password:passwordPolicy}).strict().parse(input);
+    const data=z.object({token:z.string().regex(/^[a-f0-9]{64}$/,'Reset link is invalid or expired'),password:passwordPolicy}).strict().parse(input);
     await throttle(`reset-token:${digest(data.token)}`,10);
     const passwordHash=await hashPassword(data.password);
     await transaction(async db=>{

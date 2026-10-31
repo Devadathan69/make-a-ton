@@ -24,9 +24,9 @@ function decryptPayload(payload:unknown) {
   return z.object({to:z.email(),url:z.url()}).parse(JSON.parse(Buffer.concat([decipher.update(Buffer.from(p.data,'hex')),decipher.final()]).toString()));
 }
 /** Serialized per message. SMTP may have an ambiguous acceptance outcome; never auto-retry DATA errors. */
-export async function deliverOutbox(sender?:EmailSender,limit=10) {
+export async function deliverOutbox(sender?:EmailSender,limit=10,onlyDedupeKey?:string) {
   const send=sender??smtpSender();z.number().int().min(1).max(50).parse(limit);
-  const candidates=(await getPool().query<{id:string;kind:string;payload:unknown}>("SELECT id,kind,payload FROM outbox_messages WHERE sent_at IS NULL AND delivery_state IN ('QUEUED','FAILED') AND next_attempt_at<=now() AND attempts<5 ORDER BY created_at,id LIMIT $1",[limit])).rows;
+  const candidates=(await getPool().query<{id:string;kind:string;payload:unknown}>("SELECT id,kind,payload FROM outbox_messages WHERE sent_at IS NULL AND delivery_state IN ('QUEUED','FAILED') AND next_attempt_at<=now() AND attempts<5 AND ($2::text IS NULL OR dedupe_key=$2) ORDER BY created_at,id LIMIT $1",[limit,onlyDedupeKey??null])).rows;
   const result={sent:0,failed:0,uncertain:0,skipped:0};
   for(const candidate of candidates) {
     let outcome: "sent"|"failed"|"uncertain"|"skipped";

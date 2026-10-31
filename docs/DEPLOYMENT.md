@@ -40,3 +40,5 @@ Invoice email queues are unique per invoice. SMTP processing occurs after invoic
 Verify a public HTTPS application and dedicated DB, real reset/invoice emails, an authenticated deployed scheduler run, cross-role browser flows and deployed 5,000-record API/page p95 under two seconds. Record against the exact tested main commit. Teammate catalog/subscription/portal/finance interfaces still need their owners' implementation PRs; this core work preserves their files and exports. Portal starter copy and missing feature forms are not evidence of completed UI integration.
 
 Contest portal/evaluator identity, deadline/window, functional video and submission require actual supplied details and separate authorization. No evaluator was invited and nothing was submitted.
+
+For the proposed Vercel Hobby + Neon demo, use [the provider compatibility profile](VERCEL_NEON.md). It supersedes generic scheduler assumptions: Neon migrations need the direct connection; Hobby cron is daily GET; request-lifecycle reset delivery and a separate backlog catch-up strategy are required. vercel.example.json does not activate any schedule by itself.
