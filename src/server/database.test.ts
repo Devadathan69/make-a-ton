@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { migrate } from '../../scripts/migrate.mjs';
 
@@ -13,7 +13,7 @@ describe.skipIf(!url)('connected PostgreSQL migrations', () => {
   afterAll(async()=>{await client.query(`DROP SCHEMA ${schema} CASCADE`);await client.end();});
   it('migrates, safely reruns, and detects changed applied files',async()=>{
     await migrate(client);await migrate(client);
-    expect((await client.query('SELECT count(*) FROM schema_migrations')).rows[0].count).toBe('2');
+    expect((await client.query('SELECT count(*) FROM schema_migrations')).rows[0].count).toBe(String((await readdir('db/migrations')).filter(f=>f.endsWith('.sql')).length));
     const dir=await mkdtemp(`${tmpdir()}/loopledger-migration-`);
     try {
       await writeFile(`${dir}/001_foundation.sql`,(await readFile('db/migrations/001_foundation.sql','utf8'))+'\n-- changed');

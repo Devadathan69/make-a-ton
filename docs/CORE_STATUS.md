@@ -38,3 +38,11 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Best-value selection with rule-ID tie break, deterministic proportional largest-remainder allocation, per-line/per-tax half-up rounding and safe DTO bounds.
 - Pure previews never mutate usage. Exact stored inputs produce the explanation.
 - Focused financial tests reconcile every line/header and cover the agreed 1000000 / 100000 / 90000 / 990000 fixture, Odoo +56000 adjustment, base fee, fixed caps, grouped lines, thresholds, ties, date/cap eligibility and rounding.
+
+## D4 lifecycle and contract snapshots
+
+- Draft creation/editing resolves authoritative catalog economics. Template prefill validates references and validity; sequence-backed readable subscription numbers.
+- Serialized quote/confirm/activate/pause/resume/renew/close transitions, role/owner/policy/date-based allowedActions and audit history. Catch-up is required before pausing/closing overdue unissued periods.
+- Confirmation snapshots plan fee/policies, product/variant descriptions/economics and tax rates. Confirmed economics cannot be edited; preview uses the pure calculator and consumes no usage or invoice number.
+- Calendar anchors retain Jan 31 and Feb 29 semantics across clamps. Expiry must be on a boundary. Resume starts a fresh cycle, does not refund prior time, and requires expiry alignment with that new anchor.
+- Closed renewal requires a permitted plan and an explicitly supplied future startDate in the transition POST. Existing facade signatures remain unchanged; closed renew is not advertised as an action without that input.
