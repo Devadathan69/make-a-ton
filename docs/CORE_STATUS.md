@@ -31,3 +31,10 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Strict Zod validation, safe paise/rates, reference and variant-parent validation, deterministic bounded pagination/search/date/status filters, role checks and no hard-delete route.
 - Variants are archived when removed. Customer business-email edits preserve the separate authentication email and ownership link.
 - Batched SQL subqueries load variants and reference IDs; public DTOs have no auth fields.
+
+## D5 pure calculator (before lifecycle preview wiring)
+
+- BigInt intermediates; plan fee is a separate once-per-cycle line; product-group offer then subscription offer, original thresholds, inclusive dates and global usage eligibility.
+- Best-value selection with rule-ID tie break, deterministic proportional largest-remainder allocation, per-line/per-tax half-up rounding and safe DTO bounds.
+- Pure previews never mutate usage. Exact stored inputs produce the explanation.
+- Focused financial tests reconcile every line/header and cover the agreed 1000000 / 100000 / 90000 / 990000 fixture, Odoo +56000 adjustment, base fee, fixed caps, grouped lines, thresholds, ties, date/cap eligibility and rounding.
