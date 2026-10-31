@@ -1,0 +1,260 @@
+/* Customer Portal CSS Module */
+
+.portalContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.welcomeStrip {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.welcomeText h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.welcomeText p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.accountBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.portalGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.subCard {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: box-shadow 0.15s ease;
+}
+
+.subCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.subCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subCardHeader h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.subRef {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.cardMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: #fbfcfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.cardMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardMetaLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cardMetaValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.productsBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.productsBox h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.productsList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.productRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.productRow:last-child {
+  border-bottom: none;
+}
+
+.selfServiceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.selfServiceBtn {
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.selfServiceBtn:hover:not(:disabled) {
+  background: var(--canvas);
+}
+
+.selfServiceBtnPrimary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.selfServiceBtnPrimary:hover:not(:disabled) {
+  background: #115749;
+}
+
+.selfServiceBtnDanger {
+  color: #b03828;
+  border-color: #f0c3bc;
+  background: #fff5f3;
+}
+
+.selfServiceBtnDanger:hover:not(:disabled) {
+  background: #fae8e5;
+}
+
+.selfServiceBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Invoices List in Portal */
+.invoiceCard {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.invoiceCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.invoiceAmountBlock {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.overdueBadge {
+  background: #fceded;
+  color: #a82e1e;
+  border: 1px solid #f6c0b8;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 900px) {
+  .portalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcomeStrip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .cardMetaGrid {
+    grid-template-columns: 1fr;
+  }
+  .subCard {
+    padding: 16px;
+  }
+  .selfServiceActions {
+    flex-direction: column;
+  }
+  .selfServiceBtn {
+    width: 100%;
+    text-align: center;
+  }
+}
