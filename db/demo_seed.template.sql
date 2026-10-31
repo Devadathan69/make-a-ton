@@ -1,17 +1,20 @@
 -- Generated from scripts/seed-data.mjs. Parent approval and verified schema 001-005 required.
--- Replace the unquoted marker with ONE privately approved SQL string literal containing a salted scrypt hash.
--- Never store the substituted SQL/password/hash in Git, artifacts or chat. No reset or SMTP action occurs.
+-- Replace each unquoted marker with the corresponding privately approved salted scrypt hash SQL literal.
+-- Never store substituted SQL/passwords/hashes in Git, artifacts or chat. No reset or SMTP action occurs.
 BEGIN;
 DO $target$ BEGIN IF current_database() <> 'loopledger_demo' THEN RAISE EXCEPTION 'Only the approved isolated loopledger_demo database is allowed'; END IF; END $target$;
-SELECT set_config('loopledger.demo_password_hash', __APPROVED_SCRYPT_HASH_SQL_LITERAL__, true);
-DO $credential$ BEGIN IF split_part(current_setting('loopledger.demo_password_hash'),'$',1) <> 'scrypt' OR split_part(current_setting('loopledger.demo_password_hash'),'$',2) !~ '^[0-9a-f]{32}$' OR split_part(current_setting('loopledger.demo_password_hash'),'$',3) !~ '^[0-9a-f]{128}$' THEN RAISE EXCEPTION 'Supply an approved salted scrypt hash'; END IF; END $credential$;
+SELECT set_config('loopledger.demo_hash_admin', __APPROVED_ADMIN_SCRYPT_HASH_SQL_LITERAL__, true);
+SELECT set_config('loopledger.demo_hash_staff', __APPROVED_STAFF_SCRYPT_HASH_SQL_LITERAL__, true);
+SELECT set_config('loopledger.demo_hash_maple', __APPROVED_MAPLE_SCRYPT_HASH_SQL_LITERAL__, true);
+SELECT set_config('loopledger.demo_hash_north', __APPROVED_NORTH_SCRYPT_HASH_SQL_LITERAL__, true);
+DO $credential$ DECLARE config_key text; BEGIN FOREACH config_key IN ARRAY ARRAY['loopledger.demo_hash_admin','loopledger.demo_hash_staff','loopledger.demo_hash_maple','loopledger.demo_hash_north'] LOOP IF split_part(current_setting(config_key),'$',1) <> 'scrypt' OR split_part(current_setting(config_key),'$',2) !~ '^[0-9a-f]{32}$' OR split_part(current_setting(config_key),'$',3) !~ '^[0-9a-f]{128}$' THEN RAISE EXCEPTION 'Supply approved salted scrypt hashes'; END IF; END LOOP; END $credential$;
 SELECT pg_advisory_xact_lock(809032);
 INSERT INTO customers (id,name,email,company,address,created_at,updated_at) VALUES ('customer_maple','Ananya Rao','ananya@example.test','Maple Studio','Kochi, Kerala','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
-INSERT INTO users (id,name,email,password_hash,role,customer_id,created_at,updated_at) VALUES ('user_maple','Ananya Rao','ananya@example.test',current_setting('loopledger.demo_password_hash'),'CUSTOMER','customer_maple','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
+INSERT INTO users (id,name,email,password_hash,role,customer_id,created_at,updated_at) VALUES ('user_maple','Ananya Rao','ananya@example.test',current_setting('loopledger.demo_hash_maple'),'CUSTOMER','customer_maple','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
 INSERT INTO customers (id,name,email,company,address,created_at,updated_at) VALUES ('customer_north','Arjun Menon','arjun@example.test','Northstar Labs','Kochi, Kerala','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
-INSERT INTO users (id,name,email,password_hash,role,customer_id,created_at,updated_at) VALUES ('user_north','Arjun Menon','arjun@example.test',current_setting('loopledger.demo_password_hash'),'CUSTOMER','customer_north','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
-INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES ('user_admin','Demo ADMIN','admin@example.test',current_setting('loopledger.demo_password_hash'),'ADMIN','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
-INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES ('user_staff','Demo STAFF','staff@example.test',current_setting('loopledger.demo_password_hash'),'STAFF','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
+INSERT INTO users (id,name,email,password_hash,role,customer_id,created_at,updated_at) VALUES ('user_north','Arjun Menon','arjun@example.test',current_setting('loopledger.demo_hash_north'),'CUSTOMER','customer_north','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
+INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES ('user_admin','Demo ADMIN','admin@example.test',current_setting('loopledger.demo_hash_admin'),'ADMIN','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
+INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES ('user_staff','Demo STAFF','staff@example.test',current_setting('loopledger.demo_hash_staff'),'STAFF','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
 INSERT INTO products (id,name,type,sales_price,cost_price,notes,created_at,updated_at) VALUES ('prod_workspace','Workspace Suite','SOFTWARE',100000,35000,'Per seat, per billing cycle','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
 INSERT INTO product_variants (id,product_id,name,price_adjustment) VALUES ('variant_odoo','prod_workspace','Odoo',56000) ON CONFLICT DO NOTHING;
 INSERT INTO taxes (id,name,rate_bps,created_at,updated_at) VALUES ('tax_demo','Demo tax (illustrative)',1000,'2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;
