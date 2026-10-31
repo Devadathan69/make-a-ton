@@ -8,7 +8,7 @@ This is a **working development starter**, not the finished hackathon submission
 
 ### Run the starter (no accounts or database needed)
 
-Use Node.js **24 LTS** and npm. Node 22.12+ is also supported by the selected tools.
+Use Node.js **24 LTS** and npm. Node 22.13+ is also supported by the selected tools.
 
 ```powershell
 git clone https://github.com/Devadathan69/make-a-ton.git
