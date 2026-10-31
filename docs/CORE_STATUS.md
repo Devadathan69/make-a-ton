@@ -24,3 +24,10 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Login/register/forgot/reset screens, admin-only staff provisioning, protected internal/portal layouts. Session loading hides internal navigation; customer shell only shows portal.
 - Connected negative tests cover role injection, duplicate case-variant signup rollback, nine/eight-character boundary, invalid/used/expired resets, expired/logout sessions, CSRF and admin/staff denial.
 - SMTP transmission is still unverified and not yet wired; queueing is not delivery. Missing reset encryption configuration returns a visible 503.
+
+## D3 catalog/customer/template APIs
+
+- GET/list/POST/PATCH for products, plans, taxes, discounts, customers and templates through the existing adapter contracts.
+- Strict Zod validation, safe paise/rates, reference and variant-parent validation, deterministic bounded pagination/search/date/status filters, role checks and no hard-delete route.
+- Variants are archived when removed. Customer business-email edits preserve the separate authentication email and ownership link.
+- Batched SQL subqueries load variants and reference IDs; public DTOs have no auth fields.
