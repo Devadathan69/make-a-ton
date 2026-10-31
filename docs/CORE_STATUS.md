@@ -119,3 +119,5 @@ No feature-owner PRs were open at the last review. Their unfinished UI is an exp
 
 - Provider preparation passes 62 tests plus lint/types/HTTP build. Added checks cover direct-versus-pooled migration selection, GET cron authorization, zero-budget backlog retention, lifecycle-targeted reset/invoice delivery and conservative uncertainty handling.
 - Native Next after was exercised with SMTP explicitly unconfigured: invoice send returned QUEUED, the lifecycle callback persisted FAILED, and its 990000 total/400000 paid remained unchanged. No external SMTP connection was attempted. Vercel's actual lifecycle/SMTP acceptance is still a hosted verification gate.
+
+- Final provider review: creation-date filters use explicit Asia/Kolkata midnight bounds without session timezone state; a connected four-record UTC/IST boundary test passes. Schema-isolated test URLs also reject known poolers. Current full check passes 63 tests; private external setup is still parent-owned.

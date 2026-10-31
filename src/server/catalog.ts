@@ -116,8 +116,8 @@ export async function catalogRoute(request:Request,resource:Resource,id?:string)
     const searchFields=resource==='customers'?"r.name||' '||r.company||' '||r.email":'r.name';
     if(q.search)add(`${searchFields} ILIKE ?`,`%${q.search}%`);
     if(q.status) {if(!['ACTIVE','INACTIVE','CLOSED'].includes(q.status)||['customers','templates'].includes(resource))throw new HttpError(400,'VALIDATION_ERROR','Invalid status filter');add('r.active=?',q.status==='ACTIVE');}
-    if(q.from)add('r.created_at >= ?::date',q.from);
-    if(q.to)add("r.created_at < ?::date + interval '1 day'",q.to);
+    if(q.from)add("r.created_at >= (?::date::timestamp AT TIME ZONE 'Asia/Kolkata')",q.from);
+    if(q.to)add("r.created_at < ((?::date + interval '1 day') AT TIME ZONE 'Asia/Kolkata')",q.to);
     const filter=where.length?` WHERE ${where.join(' AND ')}`:'';
     const total=await one<{count:string}>(getPool(),`SELECT count(*) FROM ${tables[resource]} r${filter}`,values);
     const rows=(await getPool().query(`${selection(resource)}${filter} ORDER BY r.created_at DESC,r.id LIMIT $${values.length+1} OFFSET $${values.length+2}`,[...values,q.pageSize,(q.page-1)*q.pageSize])).rows;

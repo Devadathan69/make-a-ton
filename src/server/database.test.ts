@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { migrate, migrationConnectionString } from '../../scripts/migrate.mjs';
 
 const url = process.env.DB_TEST_URL;
+if(url)migrationConnectionString({DATABASE_URL:url});
 if (url && !/test|demo/.test(new URL(url).pathname)) throw new Error("Migration tests require a disposable demo/test database");
 it('requires a direct migration connection and prefers it over pooled runtime URLs',()=>{
   const pooled='postgresql://example.invalid-pooler.neon.tech/demo';

@@ -4,6 +4,7 @@ import { migrate } from '../../scripts/migrate.mjs';
 import { getPool } from './db';
 export async function isolatedDatabase() {
   const url=new URL(process.env.DB_TEST_URL!);
+  if(url.hostname.includes('-pooler'))throw new Error('DB_TEST_URL must be direct/unpooled for schema-isolated tests');
   if(!/test|demo/.test(url.pathname)) throw new Error('Connected tests require a disposable test/demo database');
   const root=new pg.Client({connectionString:url.toString()});await root.connect();
   const schema=`test_${randomUUID().replaceAll('-','')}`;

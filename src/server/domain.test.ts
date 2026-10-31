@@ -38,6 +38,13 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     expect((await call(`discounts`,'POST',{name:'Wrong',kind:'PERCENTAGE',value:10001,scope:'SUBSCRIPTION',productIds:[],minimumPurchase:0,minimumQuantity:1,startsAt:'2026-01-01',endsAt:null,usageLimit:null,active:true})).status).toBe(400);
   });
 
+
+  it('filters audit creation timestamps by Asia/Kolkata calendar boundaries',async()=>{
+    const times=['2026-10-30T18:29:59Z','2026-10-30T18:30:00Z','2026-10-31T18:29:59Z','2026-10-31T18:30:00Z'];
+    for(let n=0;n<times.length;n++)await fixture.db.query('INSERT INTO customers(id,name,email,company,created_at) VALUES($1,$2,$3,$2,$4)',[`zone_${n}`,'KOLKATA-DATE-BOUNDARY',`boundary-${n}@example.test`,times[n]]);
+    const response=await call('customers?search=KOLKATA-DATE-BOUNDARY&from=2026-10-31&to=2026-10-31');expect(response.status).toBe(200);
+    const page=await response.json();expect(page.total).toBe(2);expect(page.items.map((c:Customer)=>c.id)).toEqual(['zone_2','zone_1']);
+  });
   it('rejects unsafe contract aggregates including adjusted prices and taxes with field errors',async()=>{
     const huge=await create<Product>('products',{name:'Maximum test amount',type:'SERVICE',salesPrice:Number.MAX_SAFE_INTEGER,costPrice:0,notes:'Fictitious limit test',active:true,variants:[{name:'Adjustment',priceAdjustment:1}]});
     const draft={customerId:customer.id,planId:plan.id,startDate:'2026-10-01',expiryDate:null,paymentTermsDays:14,quotationValidUntil:null};
