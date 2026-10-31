@@ -1,5 +1,5 @@
 import { hashPassword } from './password.mjs';
-export async function seedDemo(client, password, {performance=false}={}) {
+export async function seedDemo(client, password, {performance=false,passwordHasher=hashPassword,log=console.log}={}) {
   if (!password || password.length < 9 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[^A-Za-z0-9]/.test(password)) throw new Error('Supply a compliant private DEMO_PASSWORD');
 try {
   await client.query('BEGIN');
@@ -11,9 +11,9 @@ try {
   const stamp = { created_at:'2026-10-01T00:00:00Z', updated_at:'2026-10-01T00:00:00Z' };
   for (const [id,name,email,company] of [['maple','Ananya Rao','ananya@example.test','Maple Studio'],['north','Arjun Menon','arjun@example.test','Northstar Labs']]) {
     await insert('customers',{id:`customer_${id}`,name,email,company,address:'Kochi, Kerala',...stamp});
-    await insert('users',{id:`user_${id}`,name,email,password_hash:await hashPassword(password),role:'CUSTOMER',customer_id:`customer_${id}`,...stamp});
+    await insert('users',{id:`user_${id}`,name,email,password_hash:await passwordHasher(password),role:'CUSTOMER',customer_id:`customer_${id}`,...stamp});
   }
-  for (const role of ['ADMIN','STAFF']) await insert('users',{id:`user_${role.toLowerCase()}`,name:`Demo ${role}`,email:`${role.toLowerCase()}@example.test`,password_hash:await hashPassword(password),role,...stamp});
+  for (const role of ['ADMIN','STAFF']) await insert('users',{id:`user_${role.toLowerCase()}`,name:`Demo ${role}`,email:`${role.toLowerCase()}@example.test`,password_hash:await passwordHasher(password),role,...stamp});
   await insert('products',{id:'prod_workspace',name:'Workspace Suite',type:'SOFTWARE',sales_price:100000,cost_price:35000,notes:'Per seat, per billing cycle',...stamp});
   await insert('product_variants',{id:'variant_odoo',product_id:'prod_workspace',name:'Odoo',price_adjustment:56000});
   await insert('taxes',{id:'tax_demo',name:'Demo tax (illustrative)',rate_bps:1000,...stamp});
@@ -36,7 +36,7 @@ try {
       SELECT 'perf_line_'||n,'perf_'||n,'prod_workspace','Workspace Suite',1,100000,'[]','[]' FROM generate_series(1,5000) n ON CONFLICT DO NOTHING`);
   }
   await client.query('COMMIT');
-  console.log('Demo seed complete. Existing records and passwords were preserved.');
+  log('Demo seed complete. Existing records and passwords were preserved.');
 } catch(error) { await client.query('ROLLBACK'); throw error; }
 }
 

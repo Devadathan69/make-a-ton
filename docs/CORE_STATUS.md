@@ -135,3 +135,5 @@ No feature-owner PRs were open at the last review. Their unfinished UI is an exp
 - Historical earlier sections record intermediate gates; the implemented UI work in this section supersedes their former missing-screen lists. Hosting/SMTP/scheduler/video gates still require actual verification.
 
 - Late finance integration retains Adrinath's invoice/history layouts and CSS; invoice and payment modals delegate to the tested shared feature implementations. Overdue and method filters now run on the server before pagination, and default report presets use the simulated server date. Both finance commits remain in merge ancestry.
+
+- Hosted seed handoff: db/demo_seed.template.sql and db/demo_seed.transaction.json are generated from the same non-destructive seed implementation. They contain a non-executable hash-literal marker, actual-database/hash-format guards and no credentials. SQL template rerun was proved on loopback: four users, one invoice, one redemption; parent alone substitutes the approved private hash and executes on the approved Neon target. No remote seed was run by this child.
