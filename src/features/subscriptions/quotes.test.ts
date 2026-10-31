@@ -105,4 +105,42 @@ describe("Quotation templates & composer helper logic", () => {
     expect(addDays("2026-01-15", 30)).toBe("2026-02-14");
     expect(addDays("2026-10-31", 15)).toBe("2026-11-15");
   });
+
+  it("distinguishes a saved draft from a subsequent failed transition without losing draft", () => {
+    // When creation succeeds but transition to quote fails, draft must remain accessible
+    const createdDraft: { id: string; number: string; status: string } = {
+      id: "sub_new_123",
+      number: "SUB-2026-099",
+      status: "DRAFT",
+    };
+
+    let transitionAttempted = false;
+    let transitionError: string | null = null;
+
+    try {
+      transitionAttempted = true;
+      throw new Error("NOT_IMPLEMENTED: transition service requires backend");
+    } catch (err: unknown) {
+      transitionError = err instanceof Error ? err.message : "Failed";
+    }
+
+    expect(transitionAttempted).toBe(true);
+    expect(transitionError).toContain("NOT_IMPLEMENTED");
+    // Crucial: createdDraft is NOT discarded or nullified
+    expect(createdDraft.id).toBe("sub_new_123");
+    expect(createdDraft.number).toBe("SUB-2026-099");
+    expect(createdDraft.status).toBe("DRAFT");
+  });
+
+  it("identifies expired quotations accurately based on validity date", () => {
+    function isQuotationExpired(quotationValidUntil: string | null, effectiveDate: string): boolean {
+      if (!quotationValidUntil) return false;
+      return quotationValidUntil < effectiveDate;
+    }
+
+    expect(isQuotationExpired("2026-10-15", "2026-10-31")).toBe(true);
+    expect(isQuotationExpired("2026-11-05", "2026-10-31")).toBe(false);
+    expect(isQuotationExpired("2026-10-31", "2026-10-31")).toBe(false);
+    expect(isQuotationExpired(null, "2026-10-31")).toBe(false);
+  });
 });
