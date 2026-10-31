@@ -46,3 +46,11 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Confirmation snapshots plan fee/policies, product/variant descriptions/economics and tax rates. Confirmed economics cannot be edited; preview uses the pure calculator and consumes no usage or invoice number.
 - Calendar anchors retain Jan 31 and Feb 29 semantics across clamps. Expiry must be on a boundary. Resume starts a fresh cycle, does not refund prior time, and requires expiry alignment with that new anchor.
 - Closed renewal requires a permitted plan and an explicitly supplied future startDate in the transition POST. Existing facade signatures remain unchanged; closed renew is not advertised as an action without that input.
+
+## D6 transactional billing
+
+- Shared runDueBilling service for admin/manual, isolated demo clock and authenticated scheduler. Bounded per-period transactions use SKIP LOCKED subscription claims and stable ordered global discount locks.
+- Atomically issues snapshot-backed invoices/lines, reserves each applied rule once, audits and advances dates. Cancelled periods retain the unique barrier. Missed cycles catch up across reruns and future confirmed contracts activate when due.
+- Expiry is processed against the next unissued period, preserving historical catch-up; auto-close or pause follows the snapshotted plan policy.
+- Failed periods roll back, remain due and receive separate retryable failure records; successful retry resolves the failure.
+- Scheduler endpoint requires a separate server credential and a one-minute rate guard. Hosted scheduling remains unconfigured/unverified; manual runs do not satisfy that deployment gate.

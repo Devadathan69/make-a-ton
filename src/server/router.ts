@@ -1,3 +1,4 @@
+import { billingRoute, schedulerRoute } from './billing/worker';
 import { subscriptionsRoute } from './subscriptions';
 import { catalogRoute, isResource } from './catalog';
 import { authRoute, requireUser, staffRoute } from './auth';
@@ -8,6 +9,9 @@ export async function handle(request:Request,parts:string[]):Promise<Response> {
     if(parts[0]==='auth' && parts.length===2) response=await authRoute(request,parts[1]);
     else if(parts[0]==='session' && parts.length===1 && request.method==='GET') response=Response.json({user:await requireUser(request),mode:'http'});
     else if(parts[0]==='staff' && parts.length===1) response=await staffRoute(request);
+    else if(parts.join('/')==='billing/run') response=await billingRoute(request);
+    else if(parts.join('/')==='demo/clock') response=await billingRoute(request,true);
+    else if(parts.join('/')==='scheduler/run') response=await schedulerRoute(request);
     else if(parts[0]==='subscriptions') response=await subscriptionsRoute(request,parts);
     else if(parts[0]==='portal'&&parts[1]==='subscriptions') response=await subscriptionsRoute(request,parts.slice(1),true);
     else if(isResource(parts[0]) && parts.length<=2) response=await catalogRoute(request,parts[0],parts[1]);
