@@ -33,7 +33,7 @@ export async function allowedActions(db:Db,row:SubscriptionRow,user:User,asOf:st
   if(row.status==='CONFIRMED'&&internal&&row.start_date<=asOf&&inWindow)actions.push('activate');
   if(row.status==='ACTIVE'&&p.allowPause&&inWindow)actions.push('pause');
   if(row.status==='PAUSED'&&inWindow&&(!row.expiry_date||isBoundary(asOf,row.expiry_date,p.interval)))actions.push('resume');
-  if(['CONFIRMED','ACTIVE','PAUSED'].includes(row.status)&&p.allowRenew&&row.expiry_date)actions.push('renew');
+  if(p.allowRenew&&(row.status==='CLOSED'||(['CONFIRMED','ACTIVE','PAUSED'].includes(row.status)&&row.expiry_date)))actions.push('renew');
   if(['CONFIRMED','ACTIVE','PAUSED'].includes(row.status)&&p.allowEarlyClose)actions.push('close');
   return actions;
 }
@@ -103,7 +103,9 @@ export async function saveSubscription(user:User,input:unknown,id?:string) {
 export async function transition(user:User,id:string,action:SubscriptionAction,startDate?:string) {
   return transaction(async db=>{
     const row=await subscriptionRow(db,id,user,true),asOf=await effectiveDate(db),p=policy(row);
-    const closedRenew=row.status==='CLOSED'&&action==='renew'&&p.allowRenew&&startDate&&startDate>asOf;
+    const closedRenew=row.status==='CLOSED'&&action==='renew'&&p.allowRenew;
+    if(closedRenew&&(!startDate||startDate<=asOf))throw new HttpError(422,'INVALID_RENEWAL','Choose an explicit future start date for the new cycle',{startDate:'New cycle must start after the business date'});
+    if(closedRenew){const current=await getResource(db,'plans',row.plan_id);if(!current.active||startDate!<current.availableFrom||(current.availableUntil&&startDate!>current.availableUntil))throw new HttpError(422,'INVALID_RENEWAL','New cycle start must fall within active plan availability',{startDate:'Choose an available future date'});}
     if(!(await allowedActions(db,row,user,asOf)).includes(action)&&!closedRenew)throw new HttpError(409,'INVALID_TRANSITION','This action is not available for this status, date or policy');
     if(['pause','close','resume'].includes(action)&&row.next_billing_date&&row.next_billing_date<asOf)throw new HttpError(422,'BILLING_CATCH_UP_REQUIRED','Run due billing before changing this subscription');
     if(action==='quote')await db.query("UPDATE subscriptions SET status='QUOTATION',quotation_valid_until=COALESCE(quotation_valid_until,$1::date+14),updated_at=now() WHERE id=$2",[asOf,id]);

@@ -530,6 +530,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
                           Product
                         </label>
                         <select
+                          aria-label={`Product for line ${idx + 1}`}
                           className={styles.formSelect}
                           value={line.productId}
                           onChange={(e) => handleProductChange(idx, e.target.value)}
@@ -548,6 +549,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
                           Variant / Edition
                         </label>
                         <select
+                          aria-label={`Variant for line ${idx + 1}`}
                           className={styles.formSelect}
                           value={line.variantId ?? ""}
                           onChange={(e) => handleVariantChange(idx, e.target.value || null)}
@@ -568,6 +570,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
                         </label>
                         <input
                           type="number"
+                          aria-label={`Quantity for line ${idx + 1}`}
                           min={1}
                           className={styles.formInput}
                           value={line.quantity}
@@ -601,7 +604,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
                                 type="checkbox"
                                 checked={line.taxIds.includes(t.id)}
                                 onChange={() => handleTaxToggle(idx, t.id)}
-                                style={{ display: "none" }}
+                                disabled={submitting || transitioning}
                               />
                               {t.name}
                             </label>

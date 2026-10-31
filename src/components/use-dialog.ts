@@ -1,19 +1,16 @@
 "use client";
-import { useEffect, useId } from 'react';
+import { useEffect, useLayoutEffect, useId } from 'react';
 
 /** Focus, keyboard containment and restoration for a modal root marked data-dialog-root. */
 export function useDialog(open: boolean, onClose: () => void, busy = false) {
   const id = useId();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    const timer = setTimeout(() => {
-      const roots = document.querySelectorAll<HTMLElement>('[data-dialog-root]');
-      const root = roots[roots.length - 1];
-      if (root?.getAttribute("data-dialog-root") !== id) return;
-      root?.querySelector<HTMLElement>('input:not(:disabled),select:not(:disabled),button:not(:disabled),[tabindex="0"]')?.focus();
-    }, 0);
-    return () => {clearTimeout(timer); previous?.focus();};
+    const roots = document.querySelectorAll<HTMLElement>('[data-dialog-root]');
+    const root = roots[roots.length - 1];
+    if (root?.getAttribute("data-dialog-root") === id) root.querySelector<HTMLElement>('input:not(:disabled),select:not(:disabled),button:not(:disabled),[tabindex="0"]')?.focus();
+    return () => { previous?.focus(); };
   }, [open, id]);
   useEffect(() => {
     if (!open) return;

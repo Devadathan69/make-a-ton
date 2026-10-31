@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Invoice, Session, Subscription, SubscriptionAction } from "@/lib/contracts";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
+import { Pagination } from "@/components/pagination";
 import { useDialog } from "@/components/use-dialog";
 import styles from "./portal.module.css";
 
@@ -13,11 +14,16 @@ const SELF_SERVICE_ACTIONS: SubscriptionAction[] = ["pause", "resume", "renew", 
 
 interface PortalData {
   session: Session;
+  subscriptionTotal: number;
+  invoiceTotal: number;
   subscriptions: Subscription[];
   invoices: Invoice[];
 }
 
 export function PortalPage() {
+  const [subscriptionPage, setSubscriptionPage] = useState(1);
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [newCycleStart, setNewCycleStart] = useState("");
   const [actionPendingSubId, setActionPendingSubId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -25,6 +31,7 @@ export function PortalPage() {
     subId: string;
     subNumber: string;
     action: SubscriptionAction;
+    requiresStart?: boolean;
   } | null>(null);
 
   // Document unavailable modal for mock mode
@@ -36,26 +43,30 @@ export function PortalPage() {
   const loader = useCallback(async (): Promise<PortalData> => {
     const [session, subsRes, invRes] = await Promise.all([
       api.session.get(),
-      api.portal.subscriptions({ pageSize: 50 }),
-      api.portal.invoices({ pageSize: 50 }),
+      api.portal.subscriptions({ pageSize: 10, page: subscriptionPage }),
+      api.portal.invoices({ pageSize: 10, page: invoicePage }),
     ]);
 
     return {
       session,
+      subscriptionTotal: subsRes.total,
+      invoiceTotal: invRes.total,
       subscriptions: subsRes.items,
       invoices: invRes.items,
     };
-  }, []);
+  }, [subscriptionPage, invoicePage]);
 
   const { data, loading, error, refresh } = useResource(loader);
 
   const handleSelfServiceClick = (sub: Subscription, action: SubscriptionAction) => {
-    if (action === "pause" || action === "close" || action === "resume") {
+    if (action === "pause" || action === "close" || action === "resume" || (action === "renew" && sub.status === "CLOSED")) {
       setConfirmDialog({
         subId: sub.id,
         subNumber: sub.number,
         action,
+        requiresStart: action === "renew" && sub.status === "CLOSED",
       });
+      setNewCycleStart("");
     } else {
       executeTransition(sub.id, action);
     }
@@ -66,7 +77,7 @@ export function PortalPage() {
     setActionError(null);
     setActionSuccess(null);
     try {
-      await api.portal.transition(subId, action);
+      await api.portal.transition(subId, action, confirmDialog?.requiresStart ? {startDate:newCycleStart} : undefined);
       setActionSuccess(`Successfully performed '${action}' action.`);
       setConfirmDialog(null);
       refresh();
@@ -150,7 +161,7 @@ export function PortalPage() {
           {/* Subscriptions Panel */}
           <Panel
             title="My Subscriptions"
-            aside={<small>{data.subscriptions.length} active or recent</small>}
+            aside={<small>{data.subscriptionTotal} active or recent</small>}
           >
             {data.subscriptions.length === 0 ? (
               <p className="state">No active or past subscriptions associated with your account.</p>
@@ -263,12 +274,13 @@ export function PortalPage() {
                 })}
               </div>
             )}
+            <Pagination page={subscriptionPage} total={data.subscriptionTotal} busy={loading} onPage={setSubscriptionPage}/>
           </Panel>
 
           {/* Invoices History Panel */}
           <Panel
             title="Billing & Invoices"
-            aside={<small>{data.invoices.length} invoices on record</small>}
+            aside={<small>{data.invoiceTotal} invoices on record</small>}
           >
             {data.invoices.length === 0 ? (
               <p className="state">No invoices issued for your account yet.</p>
@@ -334,6 +346,7 @@ export function PortalPage() {
                 ))}
               </div>
             )}
+            <Pagination page={invoicePage} total={data.invoiceTotal} busy={loading} onPage={setInvoicePage}/>
           </Panel>
         </div>
       )}
@@ -372,13 +385,14 @@ export function PortalPage() {
             <h3 style={{ fontSize: 17, marginBottom: 12 }}>
               {confirmDialog.action === "pause"
                 ? `Pause ${confirmDialog.subNumber}?`
-                : confirmDialog.action === "resume" ? `Resume ${confirmDialog.subNumber}?` : `Close ${confirmDialog.subNumber}?`}
+                : confirmDialog.action === "resume" ? `Resume ${confirmDialog.subNumber}?` : confirmDialog.action === "renew" ? `Renew ${confirmDialog.subNumber}?` : `Close ${confirmDialog.subNumber}?`}
             </h3>
             <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginBottom: 16 }}>
               {confirmDialog.action === "pause"
                 ? "Pausing stops future unissued billing periods. Issued invoices remain collectible. Resume starts a fresh cycle without a refund; finite expiry must align with the new anchor."
-                : confirmDialog.action === "resume" ? "Resume starts a fresh billing cycle today. Unused paid time is not refunded. Finite expiry must align with the new anchor; the server may reject an incompatible date." : "Closing terminates this subscription contract. You will not be billed for subsequent cycles. Early closure rules apply as per your plan."}
+                : confirmDialog.action === "resume" ? "Resume starts a fresh billing cycle today. Unused paid time is not refunded. Finite expiry must align with the new anchor; the server may reject an incompatible date." : confirmDialog.requiresStart ? "Renewal starts a new future cycle using the confirmed contract economics. Choose a future date within current plan availability." : "Closing terminates this subscription contract. You will not be billed for subsequent cycles. Early closure rules apply as per your plan."}
             </p>
+            {confirmDialog.requiresStart && <label>New cycle start date<input aria-label="New cycle start date" type="date" value={newCycleStart} onChange={e=>setNewCycleStart(e.target.value)} disabled={Boolean(actionPendingSubId)} required/></label>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
                 type="button"
@@ -393,7 +407,7 @@ export function PortalPage() {
                 className="button"
                 style={confirmDialog.action === "close" ? { background: "#a13627", borderColor: "#a13627" } : undefined}
                 onClick={() => executeTransition(confirmDialog.subId, confirmDialog.action)}
-                disabled={Boolean(actionPendingSubId)}
+                disabled={Boolean(actionPendingSubId) || (confirmDialog.requiresStart && !newCycleStart)}
               >
                 {actionPendingSubId ? "Processing..." : "Confirm Action"}
               </button>

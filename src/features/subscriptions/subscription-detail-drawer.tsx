@@ -27,6 +27,7 @@ function SubscriptionDetail({
   const [error, setError] = useState<string | null>(null);
 
   // Transition state
+  const [renewalStart, setRenewalStart] = useState("");
   const [transitioning, setTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [confirmingAction, setConfirmingAction] = useState<SubscriptionAction | null>(null);
@@ -87,7 +88,7 @@ function SubscriptionDetail({
     setTransitionError(null);
 
     try {
-      const updated = await api.subscriptions.transition(subscription.id, action);
+      const updated = await api.subscriptions.transition(subscription.id, action, action === "renew" && subscription.status === "CLOSED" ? {startDate: renewalStart} : undefined);
       setSubscription(updated);
       setConfirmingAction(null);
       onRefreshList();
@@ -106,7 +107,7 @@ function SubscriptionDetail({
   };
 
   const handleActionClick = (action: SubscriptionAction) => {
-    if (action === "pause" || action === "close" || action === "resume") {
+    if (action === "pause" || action === "close" || action === "resume" || (action === "renew" && subscription?.status === "CLOSED")) {
       setConfirmingAction(action);
     } else {
       executeTransition(action);
@@ -305,6 +306,7 @@ function SubscriptionDetail({
                 )}
               </div>
 
+              {isEditable && !onEditDraft && <p className="state">To edit this draft or quotation, open <a href="/quotes">Quotations &amp; Drafts</a> and select its reference.</p>}
               {/* Lines table */}
               <div className={styles.lineItemsBox}>
                 <div className={styles.lineItemsHeader}>
@@ -385,6 +387,9 @@ function SubscriptionDetail({
         onConfirm={() => confirmingAction && executeTransition(confirmingAction)}
         onCancel={() => setConfirmingAction(null)}
         loading={transitioning}
+        requiresStartDate={confirmingAction === "renew" && subscription?.status === "CLOSED"}
+        startDate={renewalStart}
+        onStartDateChange={setRenewalStart}
       />
 
       {/* Billing Estimate Modal */}

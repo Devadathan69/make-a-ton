@@ -104,7 +104,7 @@ export interface AppApi {
   customers: CrudResource<Customer, CustomerInput>;
   templates: CrudResource<QuoteTemplate, TemplateInput>;
   subscriptions: CrudResource<Subscription, SubscriptionInput> & {
-    transition(id: string, action: SubscriptionAction): Promise<Subscription>;
+    transition(id: string, action: SubscriptionAction, options?: {startDate?: string}): Promise<Subscription>;
     preview(id: string): Promise<Invoice>;
   };
   invoices: {
@@ -117,7 +117,7 @@ export interface AppApi {
   portal: {
     subscriptions(query?: ListQuery): Promise<Page<Subscription>>;
     invoices(query?: ListQuery): Promise<Page<Invoice>>;
-    transition(id: string, action: SubscriptionAction): Promise<Subscription>;
+    transition(id: string, action: SubscriptionAction, options?: {startDate?: string}): Promise<Subscription>;
   };
   billing: { run(): Promise<BillingRunResult>; advanceClock(to: string): Promise<BillingRunResult> };
 }

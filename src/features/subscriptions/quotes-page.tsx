@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { QuoteTemplate, Subscription } from "@/lib/contracts";
 import { formatDate } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
+import { SubscriptionDetailDrawer } from "./subscription-detail-drawer";
 import { TemplateDialog } from "./template-dialog";
 import { QuoteComposer } from "./quote-composer";
 import { getTodayDateString } from "./quote-helpers";
@@ -14,6 +15,7 @@ import styles from "./subscriptions.module.css";
 type ActiveTab = "quotes" | "composer" | "templates";
 
 export function QuotesPage() {
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("quotes");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("QUOTATION");
@@ -267,9 +269,9 @@ export function QuotesPage() {
                               type="button"
                               className="button button-secondary"
                               style={{ padding: "4px 8px", fontSize: 11 }}
-                              onClick={() => handleContinueDraft(subscription)}
+                              onClick={() => subscription.status === "QUOTATION" ? handleContinueDraft(subscription) : setDetailId(subscription.id)}
                             >
-                              Inspect / Edit
+                              {subscription.status === "QUOTATION" ? "Inspect / Edit" : "View details"}
                             </button>
                           )}
                         </div>
@@ -395,6 +397,7 @@ export function QuotesPage() {
         </Panel>
       )}
 
+      <SubscriptionDetailDrawer subscriptionId={detailId} onClose={() => setDetailId(null)} onRefreshList={quotesResource.refresh}/>
       <TemplateDialog
         isOpen={isTemplateDialogOpen}
         template={editingTemplate}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Plan, Product, QuoteTemplate, TaxRule, TemplateInput, LineInput } from "@/lib/contracts";
 import { api, ApiError } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
@@ -32,7 +32,6 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSelectors = useCallback(async () => {
     setSelectorsLoading(true);
@@ -71,7 +70,6 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
       setGlobalError(null);
       setSubmitting(false);
 
-      setTimeout(() => nameInputRef.current?.focus(), 50);
     }
   }, [isOpen, template, fetchSelectors]);
 
@@ -268,7 +266,6 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
                   Template Name <span className={styles.requiredIndicator}>*</span>
                 </label>
                 <input
-                  ref={nameInputRef}
                   id="tmpl-name"
                   type="text"
                   className={`${styles.formInput} ${errors.name ? styles.inputError : ""}`}
@@ -429,7 +426,7 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
                                     type="checkbox"
                                     checked={line.taxIds.includes(t.id)}
                                     onChange={() => handleTaxToggle(idx, t.id)}
-                                    style={{ display: "none" }}
+                                    disabled={submitting}
                                   />
                                   {t.name}
                                 </label>

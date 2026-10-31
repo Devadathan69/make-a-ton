@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Customer, CustomerInput } from "@/lib/contracts";
 import { api, ApiError } from "@/lib/api";
 import { useDialog } from "@/components/use-dialog";
@@ -24,7 +24,6 @@ export function CustomerDialog({ isOpen, customer, onClose, onSuccess }: Custome
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const firstInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,7 +42,6 @@ export function CustomerDialog({ isOpen, customer, onClose, onSuccess }: Custome
       setSubmitting(false);
 
       // Focus first input
-      setTimeout(() => firstInputRef.current?.focus(), 50);
     }
   }, [isOpen, customer]);
 
@@ -163,7 +161,6 @@ export function CustomerDialog({ isOpen, customer, onClose, onSuccess }: Custome
                   Company Name <span className={styles.requiredIndicator}>*</span>
                 </label>
                 <input
-                  ref={firstInputRef}
                   id="cust-company"
                   type="text"
                   className={`${styles.formInput} ${errors.company ? styles.inputError : ""}`}

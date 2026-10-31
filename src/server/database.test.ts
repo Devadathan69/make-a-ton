@@ -1,3 +1,4 @@
+import { validateHostedDemoTarget } from '../../scripts/seed-data.mjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -41,4 +42,13 @@ describe.skipIf(!url)('connected PostgreSQL migrations', () => {
       expect((await client.query("SELECT to_regclass('rollback_probe') name")).rows[0].name).toBe('rollback_probe');
     } finally {await rm(dir,{recursive:true});}
   });
+});
+
+it('requires explicit exact-target approval for hosted synthetic bootstrap',()=>{
+ const direct='postgresql://ep-synthetic.ap-southeast-1.aws.neon.tech/loopledger_demo';
+ const flags={ALLOW_REMOTE_DEMO_BOOTSTRAP:'true',CONFIRM_DEMO_HOST:'ep-synthetic.ap-southeast-1.aws.neon.tech'};
+ expect(()=>validateHostedDemoTarget(direct,{})).toThrow('explicit operator approval');
+ expect(()=>validateHostedDemoTarget(direct,{...flags,CONFIRM_DEMO_HOST:'wrong.neon.tech'})).toThrow();
+ expect(()=>validateHostedDemoTarget(direct.replace('loopledger_demo','production'),flags)).toThrow();
+ expect(validateHostedDemoTarget(direct,flags).pathname).toBe('/loopledger_demo');
 });

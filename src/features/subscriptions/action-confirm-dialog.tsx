@@ -11,6 +11,9 @@ interface ActionConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
+  requiresStartDate?: boolean;
+  startDate?: string;
+  onStartDateChange?: (value: string) => void;
 }
 
 export function ActionConfirmDialog({
@@ -20,6 +23,9 @@ export function ActionConfirmDialog({
   onConfirm,
   onCancel,
   loading,
+  requiresStartDate = false,
+  startDate = "",
+  onStartDateChange,
 }: ActionConfirmDialogProps) {
   const dialogId = useDialog(isOpen && Boolean(action), onCancel, loading);
 
@@ -35,7 +41,7 @@ export function ActionConfirmDialog({
     ? `Close Subscription ${subscriptionNumber}?`
     : isResume ? `Resume Subscription ${subscriptionNumber}?` : `Confirm Action: ${action}`;
 
-  const description = isPause
+  const description = requiresStartDate ? "Renewal starts a new future cycle under the confirmed contract economics. Choose an explicit future start date; current plan availability is validated by the server." : isPause
     ? "Pausing this subscription will hold future recurring billing cycles from generating invoices until resumed. Any previously issued invoices remain collectible."
     : isClose
     ? "Closing this subscription terminates the contract. Early closure is governed by the subscription plan's policy, and future billing will cease permanently."
@@ -66,6 +72,7 @@ export function ActionConfirmDialog({
           </p>
         </div>
 
+        {requiresStartDate && <label className={styles.modalBody}>New cycle start date<input aria-label="New cycle start date" type="date" value={startDate} onChange={e=>onStartDateChange?.(e.target.value)} disabled={loading} required/></label>}
         <div className={styles.modalFooter}>
           <button
             type="button"
@@ -80,7 +87,7 @@ export function ActionConfirmDialog({
             className={`button ${isClose ? styles.actionBtnDanger : ""}`}
             style={isClose ? { background: "#a13627", borderColor: "#a13627" } : undefined}
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || (requiresStartDate && !startDate)}
           >
             {loading ? "Processing..." : isPause ? "Confirm Pause" : isClose ? "Confirm Closure" : "Proceed"}
           </button>
