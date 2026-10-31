@@ -15,17 +15,30 @@ function queryString(query?: object): string {
   return values.size ? `?${values}` : "";
 }
 
-export async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const response = await fetch(`/api/v1${path}`, {
+/** A request key survives automatic payment retries. Other mutations are not auto-retried. */
+export async function request<T>(path: string, method = "GET", body?: unknown, idempotencyKey?: string): Promise<T> {
+  const payment = path === "/payments" && method === "POST";
+  const key = payment ? idempotencyKey ?? crypto.randomUUID() : undefined;
+  const options: RequestInit = {
     method, credentials: "same-origin", cache: "no-store",
-    headers: { "Content-Type": "application/json", ...(method === "GET" ? {} : { "X-LoopLedger-CSRF": "1" }) },
+    headers: { "Content-Type": "application/json", ...(method === "GET" ? {} : { "X-LoopLedger-CSRF": "1" }), ...(key ? { "Idempotency-Key": key } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null) as ApiErrorBody | null;
-    throw new ApiError(payload?.error?.code ?? "HTTP_ERROR", payload?.error?.message ?? `Request failed (${response.status})`, response.status, payload?.error?.fields);
+  };
+  for (let attempt = 0; attempt < (payment ? 2 : 1); attempt++) {
+    let response: Response;
+    try { response = await fetch(`/api/v1${path}`, options); }
+    catch {
+      if (payment && attempt === 0) continue;
+      throw new ApiError("NETWORK_ERROR", "Connection failed. Retry the same payment draft to preserve its request key.", 0);
+    }
+    if (payment && attempt === 0 && [502, 503, 504].includes(response.status)) continue;
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as ApiErrorBody | null;
+      throw new ApiError(payload?.error?.code ?? "HTTP_ERROR", payload?.error?.message ?? `Request failed (${response.status})`, response.status, payload?.error?.fields);
+    }
+    return response.json() as Promise<T>;
   }
-  return response.json() as Promise<T>;
+  throw new ApiError("NETWORK_ERROR", "Payment response is unavailable", 0);
 }
 
 function crud<T, I>(path: string): CrudResource<T, I> {
@@ -38,6 +51,9 @@ function crud<T, I>(path: string): CrudResource<T, I> {
 }
 
 export function createHttpApi(): AppApi {
+  // Retain the key on a rejected input object; a fresh draft gets a new key.
+  // Success removes the key so a genuinely new payment can reuse a form object.
+  const paymentKeys = new WeakMap<object, string>();
   const listInvoices = (query?: ListQuery) => request<Awaited<ReturnType<AppApi["invoices"]["list"]>>>(`/invoices${queryString(query)}`);
   return {
     session: { get: () => request("/session") },
@@ -55,7 +71,18 @@ export function createHttpApi(): AppApi {
     },
     payments: {
       list: (query) => request(`/payments${queryString(query)}`),
-      create: (input) => request("/payments", "POST", input),
+      create: async (input) => {
+        const key = paymentKeys.get(input) ?? crypto.randomUUID();
+        paymentKeys.set(input, key);
+        try {
+          const payment = await request<Awaited<ReturnType<AppApi["payments"]["create"]>>>("/payments", "POST", input, key);
+          paymentKeys.delete(input);
+          return payment;
+        } catch (error) {
+          if (error instanceof ApiError && error.status > 0 && error.status < 500) paymentKeys.delete(input);
+          throw error;
+        }
+      },
     },
     reports: { summary: (query) => request(`/reports/summary${queryString(query)}`) },
     portal: {

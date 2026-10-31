@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import type { BillingInterval } from '@/lib/contracts';
 import { isolatedDatabase } from '../test-db';
+import { reportSummary } from '../reports';
 import { runDueBilling } from './worker';
 
 describe.skipIf(!process.env.DB_TEST_URL)('transactional recurring billing',()=>{
@@ -56,4 +57,10 @@ describe.skipIf(!process.env.DB_TEST_URL)('transactional recurring billing',()=>
     expect((await runDueBilling('2026-05-31',2)).generated).toBe(2);
     expect((await fixture.db.query("SELECT count(*) FROM subscriptions WHERE next_billing_date<='2026-05-31'")).rows[0].count).not.toBe('0');
   });
+  it('rounds normalized recurring value once across all four interval aggregates',async()=>{
+    for(const interval of ['DAILY','WEEKLY','MONTHLY','YEARLY'] as const)await subscription(interval,interval);
+    await fixture.db.query('UPDATE subscription_lines SET unit_price=1');
+    const report=await reportSummary();expect(report.activeSubscriptions).toBe(4);expect(report.mrr).toBe(36);
+  });
+
 });

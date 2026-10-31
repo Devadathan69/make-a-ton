@@ -63,3 +63,10 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Nodemailer transport requires TLS and explicit EMAIL_DELIVERY_ENABLED opt-in. Delivery status is optional compatible Invoice.emailStatus/emailError; SENT means SMTP acceptance, not confirmed mailbox delivery.
 - Failed sends are visible/retryable. Ambiguous DATA acceptance is UNCERTAIN and requires explicit reconciliation before retry. SMTP cannot promise exactly-once external delivery across a process/database crash after acceptance; stable Message-ID aids reconciliation.
 - Connected tests inject a local sender; no real external email was sent. Actual SMTP acceptance/reset/invoice email remains a deployment gate.
+
+## D8 payments and reports
+
+- Payment transport preserves a random request key through automatic network/502/503/504 retry. Retrying a rejected input object preserves its key; a fresh draft or a successful request gets a new one. Other mutations are not silently retried.
+- Server keys serialize across invoices, compare canonical actor/payload hashes, lock invoice balances and atomically insert payment/update status/audit. Positive safe amounts and nonfuture local payment dates are required.
+- Reports use a consistent read snapshot, separate billed from collected, and keep current outstanding/overdue independent of date filters. Months are zero-filled; report ranges are bounded to 120 months.
+- PostgreSQL groups identical active contracts before recurring-value calculation; no per-subscription query or browser dataset is used. All MVP contract lines recur. Current eligible recurring discounts apply before-tax; normalization rounds the total once across intervals.

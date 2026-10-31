@@ -1,3 +1,5 @@
+import { paymentsRoute } from './payments';
+import { reportsRoute } from './reports';
 import { outboxRoute } from './outbox';
 import { invoicesRoute } from './invoices';
 import { billingRoute, schedulerRoute } from './billing/worker';
@@ -14,6 +16,8 @@ export async function handle(request:Request,parts:string[]):Promise<Response> {
     else if(parts.join('/')==='billing/run') response=await billingRoute(request);
     else if(parts.join('/')==='demo/clock') response=await billingRoute(request,true);
     else if(parts.join('/')==='scheduler/run') response=await schedulerRoute(request);
+    else if(parts[0]==='payments') response=await paymentsRoute(request,parts);
+    else if(parts.join('/')==='reports/summary') response=await reportsRoute(request);
     else if(parts[0]==='outbox') response=await outboxRoute(request,parts);
     else if(parts[0]==='invoices') response=await invoicesRoute(request,parts);
     else if(parts[0]==='portal'&&parts[1]==='invoices') response=await invoicesRoute(request,parts.slice(1),true);
