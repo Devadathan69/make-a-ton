@@ -4,7 +4,7 @@ Subscription operations for Brightloop Software, built for **Odoo x Make-A-Ton 9
 
 ## Start here
 
-This is a **working development starter**, not the finished hackathon submission. It includes a responsive app shell, ten fixture-backed feature screens, stable typed mock/HTTP adapters, a PostgreSQL foundation migration, tests, and CI. Authentication, domain endpoints, billing, real payments, invoice documents/email, reports, and deployment remain implementation work.
+The core now includes PostgreSQL repositories/migrations, authenticated customer/staff/admin roles, catalog and subscription APIs, immutable contract snapshots, exact recurring billing, invoice actions/documents, a guarded SMTP outbox, idempotent payments, live reports and isolated demo controls. **This is not yet the finished hackathon submission:** teammate feature interfaces, approved public deployment, real SMTP/scheduler verification and contest delivery gates remain. See [core evidence](docs/CORE_STATUS.md) and [connected deployment setup](docs/DEPLOYMENT.md).
 
 ### Run the starter (no accounts or database needed)
 
@@ -20,7 +20,7 @@ npm run dev
 
 For macOS/Linux use `cp .env.example .env.local` instead. Open http://localhost:3000. The home route redirects to `/dashboard`.
 
-Default mode is `NEXT_PUBLIC_DATA_MODE=mock`. Fixture CRUD is browser-memory only and resets on reload. Financial reports are fixed examples. Billing, lifecycle actions, payments, sending, and documents are intentionally unavailable until the backend is implemented. A visible banner identifies this mode. It is not a secure production app.
+Default mode is `NEXT_PUBLIC_DATA_MODE=mock`. Fixture CRUD is browser-memory only and resets on reload. Financial reports are fixed examples. In mock mode, billing, lifecycle actions, payments, sending and documents remain intentionally unavailable; use connected mode for implemented server behavior. A visible banner identifies this mode. It is not a secure production app.
 
 ## Five implementation documents
 
@@ -58,7 +58,7 @@ src/features/portal/          Hannath
 src/features/finance/         Adrinath
 src/lib/contracts.ts          Shared DTOs and API interface
 src/lib/api/                  Mock and HTTP adapters
-src/server/                   Backend foundation; Devadathan
+src/server/                   Auth, repositories, domain services, billing and reports
 db/migrations/                Versioned PostgreSQL SQL
 scripts/                      Migration and HTTP smoke tooling
 ```
@@ -71,14 +71,16 @@ Money DTOs use integer paise; percentage rates use basis points. Plan fees are o
 | --- | --- |
 | `npm run dev` | Local development |
 | `npm run check` | Lint, types, unit tests, production build |
-| `npm test` | Focused contract/money helper tests |
+| `npm test` | Contract, financial/calendar and disposable-DB integration tests |
 | `npm run build` / `npm start` | Production build/server |
-| `npm run smoke` | Check all starter routes against running localhost:3000 |
+| `npm run smoke` | HTTP liveness, readiness and protected-route smoke (optional local demo login) |
 | `npm run db:migrate` | Apply versioned SQL to DATABASE_URL |
+| `npm run db:seed` / `db:seed:performance` | Non-destructive loopback demo/test data / 5,000 subscriptions |
+| `npm run benchmark` / `qa:browser` | Explicit local performance / Chromium QA evidence |
 
 `SMOKE_BASE_URL` can select a different running server for smoke checks. CI runs checks on main/member branch pushes and PRs.
 
-Bootstrap verification: lint/types/build and 11 tests pass; all ten feature screens were rendered in a browser, the mobile dashboard was checked, and all 12 smoke routes responded. Foundation SQL executed successfully in an embedded PostgreSQL engine (23 tables); the real PostgreSQL migration runner and backend integrations still require Devadathan's environment/tests. The runtime dependency audit is clean; npm currently reports moderate advisories in the development lint toolchain, which should be revisited with compatible upstream updates.
+Verification now includes real PostgreSQL 17 migration/rerun/rollback and connected auth/domain/billing/payment concurrency checks, strict types, lint and HTTP production build. Local Chromium and 5,000-record measurements are recorded in the core status; they do not establish hosted performance or email delivery.
 
 ## Optional database setup (Devadathan)
 
@@ -90,7 +92,7 @@ npm run db:migrate
 
 The local container uses development-only credentials and a persistent named volume. Managed PostgreSQL works too. Migration checksums protect already applied SQL. No real DB, auth, email, or scheduler is required for feature UI development.
 
-To use real endpoints later, implement `/api/v1` as documented, set `NEXT_PUBLIC_DATA_MODE=http`, configure server secrets, and restart/rebuild. HTTP mode never falls back to fixtures. Do not deploy the mock preview as the completed application.
+To use the implemented endpoints, set `NEXT_PUBLIC_DATA_MODE=http`, configure the private runtime settings described in docs/DEPLOYMENT.md, migrate PostgreSQL and restart/rebuild. `npm start` runs the standalone build and binds loopback by default (`APP_HOST` controls intentional host binding). HTTP mode never falls back to fixtures. Do not deploy the mock preview as the completed application.
 
 ## Submission reminders
 

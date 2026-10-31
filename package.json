@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start.mjs",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
@@ -18,7 +18,9 @@
     "db:migrate": "node scripts/migrate.mjs",
     "smoke": "node scripts/smoke.mjs",
     "db:seed": "node scripts/seed.mjs",
-    "db:seed:performance": "node scripts/seed.mjs --performance"
+    "db:seed:performance": "node scripts/seed.mjs --performance",
+    "benchmark": "node scripts/benchmark.mjs",
+    "qa:browser": "node scripts/browser-qa.mjs"
   },
   "dependencies": {
     "next": "16.4.3",

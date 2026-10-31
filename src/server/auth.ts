@@ -76,11 +76,15 @@ export async function authRoute(request:Request,action:string):Promise<Response>
   if(action==='login') {
     const data=z.object({email,password:z.string().min(1).max(200)}).strict().parse(input);
     await throttle(`login:${digest(data.email)}`,20);
-    const row=await findUserByEmail(getPool(),data.email);
-    const valid=await verifyPassword(data.password,row?.password_hash??await dummyHash);
-    if(!row||!valid) throw new HttpError(401,'INVALID_CREDENTIALS','Email or password is incorrect');
-    const user=publicUser(row),token=await newSession(getPool(),user);
-    return Response.json({user,mode:'http'},{headers:{'Set-Cookie':cookie(token)}});
+    const result=await transaction(async db=>{
+      // Password verification and session insertion share the user lock with reset.
+      // An old-password login cannot insert a new session after reset revocation.
+      const row=await findUserByEmail(db,data.email,true);
+      const valid=await verifyPassword(data.password,row?.password_hash??await dummyHash);
+      if(!row||!valid) throw new HttpError(401,'INVALID_CREDENTIALS','Email or password is incorrect');
+      const user=publicUser(row);return {user,token:await newSession(db,user)};
+    });
+    return Response.json({user:result.user,mode:'http'},{headers:{'Set-Cookie':cookie(result.token)}});
   }
   if(action==='forgot-password') {
     const data=z.object({email}).strict().parse(input);

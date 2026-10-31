@@ -1,6 +1,6 @@
 import { getPool, one, type Db } from './db';
 import { HttpError } from './errors';
-export function realDate() {return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+export function realDate() {const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',calendar:'iso8601',numberingSystem:'latn',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const get=(type:string)=>parts.find(p=>p.type===type)!.value;return `${get('year')}-${get('month')}-${get('day')}`;}
 export function demoEnabled() {
   if(process.env.ENABLE_DEMO_CLOCK!=='true')return false;
   const url=new URL(process.env.DATABASE_URL!);

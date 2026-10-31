@@ -29,5 +29,6 @@ jobs:
       - run: npm ci
       - run: npm run check
         env:
-          NEXT_PUBLIC_DATA_MODE: mock
+          NEXT_PUBLIC_DATA_MODE: http
+          APP_URL: http://localhost:3000
           DB_TEST_URL: postgresql://loopledger:disposable-ci-only@localhost:5432/loopledger_test

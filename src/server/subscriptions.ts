@@ -43,6 +43,7 @@ export async function subscriptionDto(db:Db,row:SubscriptionRow,user:User,asOf:s
   return {id:row.id,...timestamps(row),number:row.number,customerId:row.customer_id,customerName:row.customer_name,planId:row.plan_id,planName:p.name,status:row.status,startDate:row.start_date,expiryDate:row.expiry_date,nextBillingDate:row.next_billing_date,paymentTermsDays:row.payment_terms_days,quotationValidUntil:row.quotation_valid_until,allowedActions:await allowedActions(db,row,user,asOf),lines:(lines??await subscriptionLines(db,row.id)).map(l=>({id:l.id,productId:l.product_id,variantId:l.variant_id,quantity:l.quantity,taxIds:z.array(z.string()).parse(l.tax_ids),description:l.description,unitPrice:safeInteger(l.unit_price),subtotal:safeInteger(BigInt(l.unit_price)*BigInt(l.quantity))}))};
 }
 export async function resolveEconomics(db:Db,input:SubscriptionInput) {
+  const bounded=(value:bigint)=>{try{return safeInteger(value);}catch{throw new HttpError(422,'AMOUNT_RANGE','Contract economics exceed supported safe amounts',{'lines':'Reduce price or quantity'});}};
   await validateReferences(db,'customers',[input.customerId],'customerId');
   await validateReferences(db,'plans',[input.planId],'planId',true);
   if(!input.lines.length)throw new HttpError(422,'VALIDATION_ERROR','Add at least one product',{'lines':'Required'});
@@ -56,10 +57,15 @@ export async function resolveEconomics(db:Db,input:SubscriptionInput) {
   const lines=[];
   for(const l of input.lines) {
     const product=await getResource(db,'products',l.productId),variant=product.variants.find(v=>v.id===l.variantId);
-    const unitPrice=safeInteger(BigInt(product.salesPrice)+BigInt(variant?.priceAdjustment??0));safeInteger(BigInt(unitPrice)*BigInt(l.quantity));
+    const unitPrice=bounded(BigInt(product.salesPrice)+BigInt(variant?.priceAdjustment??0));bounded(BigInt(unitPrice)*BigInt(l.quantity));
     lines.push({...l,description:product.name+(variant?` / ${variant.name}`:''),unitPrice,taxes:await taxes(l.taxIds),pricing:{product:{id:product.id,name:product.name,notes:product.notes,salesPrice:product.salesPrice},variant:variant??null}});
   }
-  safeInteger(lines.reduce((n,l)=>n+BigInt(l.unitPrice)*BigInt(l.quantity),BigInt(plan.price)));
+  bounded(lines.reduce((n,l)=>n+BigInt(l.unitPrice)*BigInt(l.quantity),BigInt(plan.price)));
+  try {
+    const billing:BillingLine[]=lines.map((l,i)=>({...l,id:`validate_${i}`}));
+    if(plan.price||plan.taxes.length)billing.push({id:'validate_base',productId:null,description:plan.name,quantity:1,unitPrice:plan.price,taxes:plan.taxes});
+    calculate(billing,[],input.startDate);
+  } catch { throw new HttpError(422,'AMOUNT_RANGE','Contract totals including taxes exceed supported safe amounts',{'lines':'Reduce price or quantity'}); }
   return {plan,lines};
 }
 async function replaceLines(db:Db,id:string,economics:Awaited<ReturnType<typeof resolveEconomics>>) {
