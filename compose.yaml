@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: loopledger
+      POSTGRES_PASSWORD: loopledger
+      POSTGRES_DB: loopledger
+    volumes:
+      - loopledger-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loopledger -d loopledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  loopledger-data:
