@@ -103,3 +103,9 @@ No feature-owner PRs were open at the last review. Their unfinished UI is an exp
 
 - Final Chromium pass after the pre-render proxy: admin staff creation, staff settings denial, actual demo-clock change and refresh, customer portal isolation/registration/logout, and desktop/mobile overflow all pass without runtime errors. Page p95 (20 samples after warmup, including network-idle wait) was 715/685/691 ms for dashboard/subscriptions/invoices.
 - Final input guards cap streamed JSON at 100,000 bytes without trusting Content-Length, reject repeated tax IDs, and return field errors for adjusted-price/tax totals exceeding safe integer bounds.
+
+## Post-D9 query-boundary review
+
+- Draft subscription lists now join plan policy fields in the paginated query; increasing page size from 1 to 20 adds no queries (connected regression test).
+- Contract resolution batches product/tax references and discount evaluation batches rules, avoiding per-line/per-rule network reads.
+- HTTP-mode check passes with 58 tests, lint, strict types and production build. This corrects an active-only performance blind spot; owner UI files remain unchanged.
