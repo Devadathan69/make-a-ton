@@ -1,14 +1,14 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api,ApiError} from '@/lib/api';
-import type {PaymentInput,PaymentMethod} from '@/lib/contracts';
+import type {PaymentInput,PaymentMethod,Payment} from '@/lib/contracts';
 import {useResource} from '@/lib/use-resource';
 import {formatMoney} from '@/lib/format';
 import {ResourceState} from '@/components/ui';
 import {Modal,Pagination,announceRefresh,failure} from './common';
 import {paymentAmount} from './payment-validation';
 import styles from './finance.module.css';
-export function PaymentDialog({invoiceId:initialId='',onClose,onSaved}:{invoiceId?:string;onClose:()=>void;onSaved:()=>void}){
+export function PaymentDialog({invoiceId:initialId='',onClose,onSaved}:{invoiceId?:string;onClose:()=>void;onSaved:(payment:Payment)=>void}){
  const [invoiceId,setInvoiceId]=useState(initialId),[search,setSearch]=useState(''),[page,setPage]=useState(1),[amount,setAmount]=useState(''),[method,setMethod]=useState<PaymentMethod>('BANK_TRANSFER'),[paidAt,setPaidAt]=useState(''),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[ambiguous,setAmbiguous]=useState(false),[success,setSuccess]=useState('');
  const attempted=useRef<PaymentInput|null>(null);
  const choices=useResource(useCallback(()=>api.invoices.list({status:'CONFIRMED',search,page,pageSize:10}),[search,page]));
@@ -28,7 +28,7 @@ export function PaymentDialog({invoiceId:initialId='',onClose,onSaved}:{invoiceI
    input=attempted.current;
   }
   setBusy(true);
-  try{const result=await api.payments.create(input);setAmbiguous(false);setSuccess(`Recorded ${formatMoney(result.amount)} for ${result.invoiceNumber}. Payment reference: ${result.id}`);announceRefresh();onSaved();}
+  try{const result=await api.payments.create(input);setAmbiguous(false);setSuccess(`Recorded ${formatMoney(result.amount)} for ${result.invoiceNumber}. Payment reference: ${result.id}`);announceRefresh();onSaved(result);}
   catch(e){setError(failure(e));const uncertain=e instanceof ApiError&&(e.status===0||e.status>=500);setAmbiguous(uncertain);if(!uncertain)detail.refresh();}
   finally{setBusy(false);}
  }
