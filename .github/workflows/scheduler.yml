@@ -1,0 +1,24 @@
+name: Due billing scheduler
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: due-billing-scheduler
+  cancel-in-progress: false
+jobs:
+  run:
+    # Remains disabled until deployment/provider setup is approved and verified.
+    if: vars.ENABLE_BILLING_SCHEDULER == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Invoke authenticated scheduler
+        env:
+          APP_URL: ${{ secrets.LOOPLEDGER_APP_URL }}
+          CRON_SECRET: ${{ secrets.LOOPLEDGER_CRON_SECRET }}
+        run: |
+          test -n "$APP_URL" && test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 65 --retry-all-errors --max-time 50 --request POST --header "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/v1/scheduler/run"

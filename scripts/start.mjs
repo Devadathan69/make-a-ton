@@ -1,0 +1,10 @@
+import { cp, access } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fork } from 'node:child_process';
+const target=resolve('.next/standalone');
+await access(`${target}/server.js`).catch(()=>{throw new Error('Run npm run build before npm start');});
+await cp('.next/static',`${target}/.next/static`,{recursive:true});
+await cp('public',`${target}/public`,{recursive:true});
+const child=fork(`${target}/server.js`,[],{stdio:'inherit',env:{...process.env,HOSTNAME:process.env.APP_HOST??'127.0.0.1'}});
+for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>child.kill(signal));
+child.on('exit',code=>process.exit(code??0));

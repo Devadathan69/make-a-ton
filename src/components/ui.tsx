@@ -19,5 +19,6 @@ export function Table({ headings, children }: { headings: string[]; children: Re
   return <div className="table-wrap"><table><thead><tr>{headings.map((heading) => <th scope="col" key={heading}>{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;
 }
 export function StarterNote({ owner, children }: { owner: string; children: ReactNode }) {
+  if (process.env.NEXT_PUBLIC_DATA_MODE === "http") return null;
   return <div className="starter-note"><span className="note-dot" /><p><strong>{owner}&apos;s workspace.</strong> {children}</p></div>;
 }

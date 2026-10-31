@@ -13,7 +13,7 @@ Branch: `feat/devadathan-core`. No teammate-owned files changed.
 
 ## Remaining gates
 
-D2-D9 remain in progress: real auth/permissions, domain APIs, lifecycle/snapshots, billing, documents/outbox, payments/reports, clock, deployment/integration.
+Core D1-D8 services and the D9 local clock/admin/deployment preparation are implemented below. Real SMTP acceptance, hosted scheduling, public deployment, teammate UI integration and deployed performance remain open gates.
 SMTP delivery, hosted scheduler, deployment performance, evaluator invitation and contest submission require verified setup. No external account credentials were provisioned, emails sent, or deployment published.
 
 ## D2 authentication increment
@@ -23,7 +23,7 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Reset tokens are hashed, expire after 30 minutes, single use; reset revokes all sessions and sibling tokens. Reset email outbox payload is encrypted with a separately configured key; tokens are carried in URL fragments and are not returned by the API.
 - Login/register/forgot/reset screens, admin-only staff provisioning, protected internal/portal layouts. Session loading hides internal navigation; customer shell only shows portal.
 - Connected negative tests cover role injection, duplicate case-variant signup rollback, nine/eight-character boundary, invalid/used/expired resets, expired/logout sessions, CSRF and admin/staff denial.
-- SMTP transmission is still unverified and not yet wired; queueing is not delivery. Missing reset encryption configuration returns a visible 503.
+- SMTP transmission is wired through the D7 outbox but remains unverified against an approved provider; queueing is not delivery. Missing reset encryption configuration returns a visible 503.
 
 ## D3 catalog/customer/template APIs
 
@@ -70,3 +70,36 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Server keys serialize across invoices, compare canonical actor/payload hashes, lock invoice balances and atomically insert payment/update status/audit. Positive safe amounts and nonfuture local payment dates are required.
 - Reports use a consistent read snapshot, separate billed from collected, and keep current outstanding/overdue independent of date filters. Months are zero-filled; report ranges are bounded to 120 months.
 - PostgreSQL groups identical active contracts before recurring-value calculation; no per-subscription query or browser dataset is used. All MVP contract lines recur. Current eligible recurring discounts apply before-tax; normalization rounds the total once across intervals.
+
+## D9 local integration and deployment preparation
+
+- Admin-only /operations shows billing counts, forward-only isolated demo controls, delivery states/retry, and explicit simulation labels. Shared refresh events update loaded resource views and session date labels.
+- HTTP mode hides starter implementation notes. Feature-owner files/exports remain unchanged; their pending forms, actions, filtering and portal copy remain integration gates.
+- HTTP standalone Dockerfile, DB readiness route, security headers and disabled-until-configured five-minute scheduler workflow are prepared. docs/DEPLOYMENT.md lists private setup and verification gates.
+- Public hosting, approved DB/provider secrets, actual SMTP and scheduler execution are still pending; no public deployment is claimed.
+
+## Local evidence checkpoint (2026-10-31)
+
+- HTTP mode: lint, strict types, 57 tests and production build pass against disposable PostgreSQL 17. Tests include old-password login/reset concurrency, unique taxes, owner isolation and monetary/calendar/state races.
+- A separate loopback DB contains 5,001 subscriptions (5,000 performance rows plus the baseline demo contract).
+- Initial API benchmark: 50 samples after 5 warmups; subscription list p95 15.89 ms, report p95 53.57 ms, invoice list p95 7.27 ms. The invoice benchmark had one baseline invoice. These are native local production-build loopback timings, not hosted measurements.
+- Initial Chromium page render benchmark: 20 samples after one warmup; dashboard/subscriptions/invoices p95 676/669/665 ms, including network-idle wait. Desktop 1440x1000 and mobile 390x844 checked. Login, logout, admin due-billing action, customer registration, portal-only navigation and direct internal-route denial pass with no browser runtime errors.
+- Browser screenshots and measurement JSON are generated under ignored `output/`; they contain fictitious records, not credentials. Do not commit build outputs or test data.
+- Docker build FAILED at `RUN npm ci`: container DNS returned `EAI_AGAIN` resolving registry.npmjs.org (eslint metadata). No image was published. Native npm install/build works; container build is unverified and needs a host with working approved registry DNS. No network restriction was bypassed.
+
+- Final hardening adds a Next.js 16 Node proxy for pre-streaming session/role redirects, alongside protected layouts and independent API authorization. Browser pages never rely on cached layout checks alone.
+
+## Feature-owner integration handoff
+
+All domain endpoints in the original HTTP facade are now implemented. Route wrapper exports are unchanged; internal wrappers moved under src/app/(internal) for role protection. No files under catalog, subscriptions, portal or finance feature ownership were edited.
+
+- Athul: persist catalog forms via existing CRUD facade; server returns field errors for invalid references, amounts, variants and rules. Removed variants are archived.
+- Hannath: wire quotation composer/templates, allowedActions and portal self-service/documents. Show the specified nonrefunded resume and boundary-expiry policy before confirmation. Starter portal copy still says preview/sample and must be updated in the owner's PR.
+- Adrinath: wire invoice actions/documents/payment forms/report filters. Optional Invoice.emailStatus/emailError adds queued/SMTP-accepted/failed/uncertain state. PaymentInput and payments.create signatures are unchanged: preserve the rejected input object to retry an ambiguous payment; a new draft object represents a genuinely new payment. Do not silently rebuild the same failed draft into a new payment key.
+- Compatible Session additions: optional asOf and demoClock. The shared shell and /operations show server-provided simulation labels.
+- HTTP mode hides shared StarterNote implementation instructions. This does not complete missing forms/actions in the feature-owner components.
+
+No feature-owner PRs were open at the last review. Their unfinished UI is an explicit acceptance gate, not a claim of completed integration.
+
+- Final Chromium pass after the pre-render proxy: admin staff creation, staff settings denial, actual demo-clock change and refresh, customer portal isolation/registration/logout, and desktop/mobile overflow all pass without runtime errors. Page p95 (20 samples after warmup, including network-idle wait) was 715/685/691 ms for dashboard/subscriptions/invoices.
+- Final input guards cap streamed JSON at 100,000 bytes without trusting Content-Length, reject repeated tax IDs, and return field errors for adjusted-price/tax totals exceeding safe integer bounds.

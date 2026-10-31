@@ -17,7 +17,7 @@ export const planSnapshot = z.object({
   autoClose: z.boolean(), allowEarlyClose: z.boolean(), allowPause: z.boolean(), allowRenew: z.boolean(),
   taxes: taxSnapshot,
 });
-export const lineInput = z.object({ productId: z.string().min(1), variantId: z.string().nullable(), quantity: z.number().int().min(1).max(1000000), taxIds: z.array(z.string()).max(20) });
+export const lineInput = z.object({ productId: z.string().min(1), variantId: z.string().nullable(), quantity: z.number().int().min(1).max(1000000), taxIds: z.array(z.string()).max(20).refine(v => new Set(v).size === v.length, "Remove duplicate taxes") });
 export const listQuery = z.object({
   page: z.coerce.number().int().min(1).max(1000000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),

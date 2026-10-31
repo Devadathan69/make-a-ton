@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { migrate } from '../../scripts/migrate.mjs';
 
 const url = process.env.DB_TEST_URL;
+if (url && !/test|demo/.test(new URL(url).pathname)) throw new Error("Migration tests require a disposable demo/test database");
 // This suite creates an isolated schema, never drops an existing application schema.
 describe.skipIf(!url)('connected PostgreSQL migrations', () => {
   const schema=`test_${crypto.randomUUID().replaceAll('-','')}`;

@@ -8,7 +8,8 @@ export function useResource<T>(loader: () => Promise<T>) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
-  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const refresh = useCallback(() => { setLoading(true); setRevision((value) => value + 1); }, []);
+  useEffect(() => { window.addEventListener("loopledger:refresh", refresh); return () => window.removeEventListener("loopledger:refresh", refresh); }, [refresh]);
   useEffect(() => {
     let cancelled = false;
     loader().then((result) => {

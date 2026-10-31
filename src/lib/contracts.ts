@@ -9,7 +9,7 @@ export type PaymentMethod = "BANK_TRANSFER" | "CARD" | "UPI" | "CASH" | "OTHER";
 /** All money uses integer paise (INR); quantities are positive integers; dates are ISO strings. */
 export interface Entity { id: string; createdAt: string; updatedAt: string }
 export interface User { id: string; name: string; email: string; role: Role; customerId: string | null }
-export interface Session { user: User; mode: "mock" | "http" }
+export interface Session { user: User; mode: "mock" | "http"; asOf?: string; demoClock?: boolean }
 export interface ProductVariant { id: string; name: string; priceAdjustment: number }
 export interface Product extends Entity {
   name: string; type: "SOFTWARE" | "SERVICE" | "ADDON"; salesPrice: number;

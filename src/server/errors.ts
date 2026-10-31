@@ -15,7 +15,15 @@ export function errorResponse(error:unknown):Response {
 }
 export async function body(request:Request):Promise<unknown> {
   if(!request.headers.get('content-type')?.startsWith('application/json')) throw new HttpError(400,'INVALID_JSON','Send application/json');
-  const raw=await request.text();
-  if(raw.length>100000) throw new HttpError(413,'BODY_TOO_LARGE','Request is too large');
+  const limit=100000;
+  if(Number(request.headers.get('content-length'))>limit)throw new HttpError(413,'BODY_TOO_LARGE','Request is too large');
+  const reader=request.body?.getReader();
+  if(!reader)throw new HttpError(400,'INVALID_JSON','Invalid JSON');
+  const decoder=new TextDecoder('utf-8',{fatal:true});let size=0,raw='';
+  try {
+    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit){await reader.cancel();throw new HttpError(413,'BODY_TOO_LARGE','Request is too large');}raw+=decoder.decode(value,{stream:true});}
+    raw+=decoder.decode();
+  } catch(error) {if(error instanceof HttpError)throw error;throw new HttpError(400,'INVALID_JSON','Invalid JSON encoding');}
+  finally{reader.releaseLock();}
   try{return JSON.parse(raw);}catch{throw new HttpError(400,'INVALID_JSON','Invalid JSON');}
 }

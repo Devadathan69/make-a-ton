@@ -1,3 +1,4 @@
+import { deliverOutbox } from '../outbox';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import type { BillingRunResult } from '@/lib/contracts';
@@ -97,5 +98,7 @@ export async function schedulerRoute(request:Request) {
   if(supplied.length!==expected.length||!timingSafeEqual(Buffer.from(supplied),Buffer.from(expected)))throw new HttpError(401,'UNAUTHENTICATED','Invalid scheduler credential');
   const throttle=await one<{attempts:number}>(getPool(),`INSERT INTO auth_throttles(bucket,attempts,resets_at) VALUES('scheduler',1,now()+interval '1 minute') ON CONFLICT(bucket) DO UPDATE SET attempts=CASE WHEN auth_throttles.resets_at<now() THEN 1 ELSE auth_throttles.attempts+1 END,resets_at=CASE WHEN auth_throttles.resets_at<now() THEN now()+interval '1 minute' ELSE auth_throttles.resets_at END RETURNING attempts`);
   if(throttle!.attempts>1)throw new HttpError(429,'THROTTLED','Retry after one minute');
-  return Response.json(await runDueBilling(await effectiveDate()));
+  const billing=await runDueBilling(await effectiveDate(),500);
+  const email=process.env.EMAIL_DELIVERY_ENABLED==='true'?await deliverOutbox():{enabled:false};
+  return Response.json({...billing,email});
 }

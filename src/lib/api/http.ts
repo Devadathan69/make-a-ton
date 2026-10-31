@@ -29,7 +29,7 @@ export async function request<T>(path: string, method = "GET", body?: unknown, i
     try { response = await fetch(`/api/v1${path}`, options); }
     catch {
       if (payment && attempt === 0) continue;
-      throw new ApiError("NETWORK_ERROR", "Connection failed. Retry the same payment draft to preserve its request key.", 0);
+      throw new ApiError("NETWORK_ERROR", payment ? "Connection failed. Retry the same payment draft to preserve its request key." : "Connection failed. Please retry.", 0);
     }
     if (payment && attempt === 0 && [502, 503, 504].includes(response.status)) continue;
     if (!response.ok) {

@@ -32,8 +32,17 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     const invalid=await call('templates','POST',{name:'Bad',planId:plan.id,validDays:1,lines:[{productId:product.id,variantId:'not-parented',quantity:1,taxIds:[]}]});
     expect(invalid.status).toBe(422);expect((await invalid.json()).error.fields).toHaveProperty('lines.variantId');
     expect((await call('products?pageSize=101')).status).toBe(400);
+    expect((await call('templates','POST',{name:'Repeated tax',planId:plan.id,validDays:1,lines:[{productId:product.id,variantId:null,quantity:1,taxIds:[tax.id,tax.id]}]})).status).toBe(400);
     const page=await (await call('products?search=Workspace&page=2&pageSize=1')).json();expect(page.total).toBe(1);expect(page.items).toEqual([]);
     expect((await call(`discounts`,'POST',{name:'Wrong',kind:'PERCENTAGE',value:10001,scope:'SUBSCRIPTION',productIds:[],minimumPurchase:0,minimumQuantity:1,startsAt:'2026-01-01',endsAt:null,usageLimit:null,active:true})).status).toBe(400);
+  });
+
+  it('rejects unsafe contract aggregates including adjusted prices and taxes with field errors',async()=>{
+    const huge=await create<Product>('products',{name:'Maximum test amount',type:'SERVICE',salesPrice:Number.MAX_SAFE_INTEGER,costPrice:0,notes:'Fictitious limit test',active:true,variants:[{name:'Adjustment',priceAdjustment:1}]});
+    const draft={customerId:customer.id,planId:plan.id,startDate:'2026-10-01',expiryDate:null,paymentTermsDays:14,quotationValidUntil:null};
+    for(const line of [{productId:huge.id,variantId:null,quantity:1,taxIds:[tax.id]},{productId:huge.id,variantId:huge.variants[0].id,quantity:1,taxIds:[]}]) {
+      const response=await call('subscriptions','POST',{...draft,lines:[line]});expect(response.status).toBe(422);expect((await response.json()).error.fields).toHaveProperty('lines');
+    }
   });
   it('archives variants without deleting referenced identities and keeps customer auth ownership',async()=>{
     const original=product.variants[0].id;
@@ -166,6 +175,37 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     expect((await call('reports/summary?from=2026-11-01&to=2026-10-01')).status).toBe(400);
     expect((await call('reports/summary','GET',undefined,`ll_session=${'b'.repeat(64)}`)).status).toBe(403);
     const payments=await (await call('payments?from=2026-10-01&to=2026-10-01&pageSize=1')).json();expect(payments.total).toBe(2);expect(payments.items).toHaveLength(1);
+  });
+
+  it('protects forward-only isolated demo clock and reruns the same worker without duplicate periods',async()=>{
+    const customerCookie=`ll_session=${'b'.repeat(64)}`;
+    expect((await call('demo/clock','POST',{to:'2026-11-02'},customerCookie)).status).toBe(403);
+    expect((await call('demo/clock','POST',{to:'2026-10-31'})).status).toBe(422);
+    process.env.ENABLE_DEMO_CLOCK='false';expect((await call('demo/clock','POST',{to:'2026-11-02'})).status).toBe(403);process.env.ENABLE_DEMO_CLOCK='true';
+    const name=process.env.DEMO_DATABASE_NAME;process.env.DEMO_DATABASE_NAME='wrong_demo';expect((await call('demo/clock','POST',{to:'2026-11-02'})).status).toBe(503);process.env.DEMO_DATABASE_NAME=name;
+    const run=await call('demo/clock','POST',{to:'2026-11-01'});expect(run.status).toBe(200);expect((await run.json()).generated).toBeGreaterThan(0);
+    const next=(await fixture.db.query("SELECT total::text FROM invoices WHERE subscription_id=$1 AND period_start='2026-11-01'",[subscription.id])).rows[0];expect(next.total).toBe('1100000');
+    const repeated=await (await call('billing/run','POST',{})).json();expect(repeated.generated).toBe(0);
+    const session=await (await call('session')).json();expect(session.asOf).toBe('2026-11-01');expect(session.demoClock).toBe(true);
+    expect((await call('system/status','GET',undefined,customerCookie)).status).toBe(403);
+  });
+  it('authenticates and throttles scheduler invocation independently of browser sessions',async()=>{
+    process.env.CRON_SECRET='fictitious-test-credential-'.repeat(2);
+    expect((await call('scheduler/run','POST',{},'',{authorization:'Bearer incorrect'})).status).toBe(401);
+    const headers={authorization:`Bearer ${process.env.CRON_SECRET}`};
+    expect((await call('scheduler/run','POST',{},'',headers)).status).toBe(200);
+    expect((await call('scheduler/run','POST',{},'',headers)).status).toBe(429);
+  });
+  it('holds uncertain SMTP acceptance for explicit reconciliation and exposes only safe outbox metadata',async()=>{
+    const pending=(await fixture.db.query("SELECT id FROM invoices WHERE status='CONFIRMED' AND subscription_id=$1 AND period_start='2026-11-01'",[subscription.id])).rows[0].id;
+    await call(`invoices/${pending}/actions`,'POST',{action:'send'});
+    const result=await deliverOutbox(async()=>{throw Object.assign(new Error('injected DATA ambiguity'),{command:'DATA'});});expect(result.uncertain).toBeGreaterThan(0);
+    expect((await call(`invoices/${pending}/actions`,'POST',{action:'send'})).status).toBe(409);
+    const outbox=await (await call('outbox')).json();expect(JSON.stringify(outbox)).not.toContain('payload');
+    const entry=outbox.find((m:{status:string})=>m.status==='UNCERTAIN');
+    expect((await call(`outbox/${entry.id}/retry`,'POST',{confirmUnknownDelivery:false})).status).toBe(409);
+    expect((await call(`outbox/${entry.id}/retry`,'POST',{confirmUnknownDelivery:true})).status).toBe(200);
+    expect((await deliverOutbox(async()=>{})).sent).toBe(1);
   });
 
 });

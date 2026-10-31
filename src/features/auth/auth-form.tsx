@@ -1,5 +1,6 @@
 'use client';
 import { useState, type FormEvent } from 'react';
+import styles from './auth.module.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { request } from '@/lib/api/http';
@@ -19,7 +20,7 @@ export function AuthForm({mode}:{mode:Mode}) {
       else {setMessage(result.message??'Completed');if(mode==='reset-password') window.history.replaceState(null,'','/reset-password');}
     } catch(err) {setError(err instanceof Error?err.message:'Request failed');}finally{setBusy(false);}
   }
-  return <section className="panel" style={{maxWidth:520,margin:'3rem auto',padding:'2rem'}}><h1>{titles[mode]}</h1><form onSubmit={submit}>
+  return <section className={styles.card}><h1>{titles[mode]}</h1><form onSubmit={submit}>
     {mode==='register'&&<p><label>Name<input required name="name" autoComplete="name" maxLength={100}/></label></p>}
     {mode!=='reset-password'&&<p><label>Email<input required type="email" name="email" autoComplete="email" maxLength={254}/></label></p>}
     {mode!=='forgot-password'&&<p><label>Password<input required type="password" name="password" minLength={mode==='login'?1:9} maxLength={200} autoComplete={mode==='login'?'current-password':'new-password'}/></label></p>}

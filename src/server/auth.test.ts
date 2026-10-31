@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDecipheriv, randomBytes } from 'node:crypto';
+import { deliverOutbox } from './outbox';
 import { handle } from './router';
 import { isolatedDatabase } from './test-db';
 import { digest } from './auth';
@@ -41,6 +42,8 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected authentication and permissi
     const token=new URLSearchParams(new URL(email.url).hash.slice(1)).get('token')!;
     const stored=(await fixture.db.query('SELECT token_hash FROM password_resets')).rows[0].token_hash;
     expect(stored).toBe(digest(token));expect(JSON.stringify(payload)).not.toContain(token);
+    let resetMessage='';expect((await deliverOutbox(async m=>{resetMessage=m.text;})).sent).toBe(1);expect(resetMessage).toContain(`#token=${token}`);
+    expect((await fixture.db.query('SELECT payload FROM outbox_messages')).rows[0].payload).toEqual({});
     expect((await send('auth/reset-password',{token:'0'.repeat(64),password:'Newpassw!'})).status).toBe(422);
     expect((await send('auth/reset-password',{token,password:'Newpassw!'})).status).toBe(200);
     expect((await send('auth/reset-password',{token,password:'Anotherp!'})).status).toBe(422);
@@ -62,4 +65,13 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected authentication and permissi
     const login=await send('auth/login',{email:'test@example.test',password:'Newpassw!'});cookie=login.headers.get('set-cookie')!.split(';')[0];
     await fixture.db.query("UPDATE sessions SET expires_at=now()-interval '1 second'");expect((await get('session')).status).toBe(401);
   });
+  it('serializes old-password login with reset so no revoked credential creates a surviving session',async()=>{
+    const token='2'.repeat(64);
+    await fixture.db.query("INSERT INTO password_resets(token_hash,user_id,expires_at) SELECT $1,id,now()+interval '10 minutes' FROM users WHERE email='test@example.test'",[digest(token)]);
+    const [login,reset]=await Promise.all([send('auth/login',{email:'test@example.test',password:'Newpassw!'}),send('auth/reset-password',{token,password:'Racepass!'})]);
+    expect(reset.status).toBe(200);expect([200,401]).toContain(login.status);
+    if(login.status===200)expect((await get('session',login.headers.get('set-cookie')!.split(';')[0])).status).toBe(401);
+    expect((await fixture.db.query("SELECT count(*) FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.email='test@example.test'")).rows[0].count).toBe('0');
+  });
+
 });

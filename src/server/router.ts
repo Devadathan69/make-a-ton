@@ -1,3 +1,4 @@
+import { demoEnabled, effectiveDate } from './clock';
 import { paymentsRoute } from './payments';
 import { reportsRoute } from './reports';
 import { outboxRoute } from './outbox';
@@ -11,11 +12,12 @@ export async function handle(request:Request,parts:string[]):Promise<Response> {
   try {
     let response:Response;
     if(parts[0]==='auth' && parts.length===2) response=await authRoute(request,parts[1]);
-    else if(parts[0]==='session' && parts.length===1 && request.method==='GET') response=Response.json({user:await requireUser(request),mode:'http'});
+    else if(parts[0]==='session' && parts.length===1 && request.method==='GET') response=Response.json({user:await requireUser(request),mode:'http',asOf:await effectiveDate(),demoClock:demoEnabled()});
     else if(parts[0]==='staff' && parts.length===1) response=await staffRoute(request);
     else if(parts.join('/')==='billing/run') response=await billingRoute(request);
     else if(parts.join('/')==='demo/clock') response=await billingRoute(request,true);
     else if(parts.join('/')==='scheduler/run') response=await schedulerRoute(request);
+    else if(parts.join('/')==='system/status'&&request.method==='GET') {await requireUser(request,['ADMIN']);response=Response.json({asOf:await effectiveDate(),simulated:demoEnabled(),emailEnabled:process.env.EMAIL_DELIVERY_ENABLED==='true',schedulerConfigured:!!process.env.CRON_SECRET&&process.env.CRON_SECRET.length>=32});}
     else if(parts[0]==='payments') response=await paymentsRoute(request,parts);
     else if(parts.join('/')==='reports/summary') response=await reportsRoute(request);
     else if(parts[0]==='outbox') response=await outboxRoute(request,parts);

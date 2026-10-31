@@ -9,6 +9,6 @@ export interface UserRow {
 export function publicUser(row: UserRow): User {
   return { id: row.id, name: row.name, email: row.email, role: row.role, customerId: row.customer_id };
 }
-export async function findUserByEmail(db: Db, email: string) {
-  return one<UserRow>(db, "SELECT * FROM users WHERE lower(email)=lower($1)", [email]);
+export async function findUserByEmail(db: Db, email: string, lock = false) {
+  return one<UserRow>(db, `SELECT * FROM users WHERE lower(email)=lower($1)${lock ? " FOR UPDATE" : ""}`, [email]);
 }
