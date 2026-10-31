@@ -15,4 +15,10 @@ describe("money at the UI boundary", () => {
   it("formats paise as INR", () => {
     expect(formatMoney(1999)).toContain("19.99");
   });
+  it("preserves the last paise across the safe integer range and negative subrupee values", () => {
+    expect(formatMoney(Number.MAX_SAFE_INTEGER)).toBe("₹9,00,71,99,25,47,409.91");
+    expect(formatMoney(-Number.MAX_SAFE_INTEGER)).toBe("-₹9,00,71,99,25,47,409.91");
+    expect(formatMoney(-1)).toBe("-₹0.01");
+    expect(formatMoney(0)).toBe("₹0.00");
+  });
 });
