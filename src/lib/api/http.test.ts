@@ -23,4 +23,15 @@ describe("frontend/backend integration boundary", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Not implemented", { status: 503 })));
     await expect(createHttpApi().reports.summary()).rejects.toMatchObject({ code: "HTTP_ERROR", status: 503 });
   });
+  it("reuses a payment key across network retries and failed-draft retries, then creates a new key after success", async () => {
+    const fetcher=vi.fn().mockRejectedValue(new TypeError('offline'));vi.stubGlobal('fetch',fetcher);
+    const api=createHttpApi(),input={invoiceId:'inv',amount:100,method:'CASH' as const,paidAt:'2026-10-31',note:''};
+    await expect(api.payments.create(input)).rejects.toMatchObject({code:'NETWORK_ERROR'});
+    const key=fetcher.mock.calls[0][1].headers['Idempotency-Key'];expect(fetcher.mock.calls[1][1].headers['Idempotency-Key']).toBe(key);
+    fetcher.mockResolvedValue(Response.json({id:'payment'}));await api.payments.create(input);
+    expect(fetcher.mock.calls[2][1].headers['Idempotency-Key']).toBe(key);
+    fetcher.mockImplementation(async()=>Response.json({id:'new'}));await api.payments.create(input);
+    expect(fetcher.mock.calls[3][1].headers['Idempotency-Key']).not.toBe(key);
+  });
+
 });

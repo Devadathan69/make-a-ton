@@ -136,4 +136,36 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     invoiceId='settlement';
   });
 
+  it('records partial/final payments once and serializes duplicate, conflicting and overpayment races',async()=>{
+    const data={invoiceId,amount:400000,method:'BANK_TRANSFER',paidAt:'2026-10-01',note:'First instalment'};
+    const key={'Idempotency-Key':'payment-partial-0001'};
+    const duplicates=await Promise.all([call('payments','POST',data,cookie,key),call('payments','POST',data,cookie,key)]);
+    expect(duplicates.map(r=>r.status)).toEqual([201,201]);const first=await duplicates[0].json();expect((await duplicates[1].json()).id).toBe(first.id);
+    let invoice=await (await call(`invoices/${invoiceId}`)).json();expect([invoice.paid,invoice.balance,invoice.status]).toEqual([400000,590000,'CONFIRMED']);
+    expect((await call(`invoices/${invoiceId}/actions`,'POST',{action:'cancel'})).status).toBe(409);
+    expect((await call('payments','POST',{...data,amount:1},cookie,key)).status).toBe(409);
+    expect((await call('payments','POST',{...data,amount:600000},cookie,{'Idempotency-Key':'payment-overpay-0001'})).status).toBe(422);
+    expect((await call('payments','POST',{...data,paidAt:'2099-01-01'},cookie,{'Idempotency-Key':'payment-future-0001'})).status).toBe(422);
+    expect((await call('payments','POST',{...data,amount:0},cookie,{'Idempotency-Key':'payment-zero-0001'})).status).toBe(400);
+    const finals=await Promise.all([call('payments','POST',{...data,amount:590000},cookie,{'Idempotency-Key':'payment-final-0001'}),call('payments','POST',{...data,amount:590000},cookie,{'Idempotency-Key':'payment-final-0002'})]);
+    expect(finals.map(r=>r.status).sort()).toEqual([201,409]);
+    invoice=await (await call(`invoices/${invoiceId}`)).json();expect([invoice.paid,invoice.balance,invoice.status]).toEqual([990000,0,'PAID']);
+    expect((await fixture.db.query('SELECT count(*) count,sum(amount)::text total FROM payments WHERE invoice_id=$1',[invoiceId])).rows[0]).toEqual({count:'2',total:'990000'});
+    expect((await call('payments','POST',data,`ll_session=${'b'.repeat(64)}`,{'Idempotency-Key':'payment-customer-0001'})).status).toBe(403);
+  });
+  it('reports billed and collected separately, keeps current balances outside date filters, and drops expired recurring discounts',async()=>{
+    const report=await (await call('reports/summary?from=2026-09-01&to=2026-11-30')).json();
+    const expected=(await fixture.db.query("SELECT sum(total)::text total FROM invoices WHERE status IN ('CONFIRMED','PAID')")).rows[0].total;
+    expect(report.billed).toBe(Number(expected));expect(report.collected).toBe(990000);expect(report.mrr).toBe(2700000);
+    expect(report.monthly.map((m:{month:string})=>m.month)).toEqual(['Sep 2026','Oct 2026','Nov 2026']);
+    expect(report.monthly[0].billed).toBe(0);expect(report.monthly[2].collected).toBe(0);
+    const emptyPeriod=await (await call('reports/summary?from=2026-09-01&to=2026-09-30')).json();
+    expect(emptyPeriod.billed).toBe(0);expect(emptyPeriod.collected).toBe(0);expect(emptyPeriod.outstanding).toBe(report.outstanding);
+    await fixture.db.query("UPDATE demo_clock SET as_of='2026-11-01'");
+    const next=await (await call('reports/summary')).json();expect(next.mrr).toBe(3000000);expect(next.overdue).toBe(next.outstanding);expect(next.attention.some((a:{kind:string})=>a.kind==='OVERDUE')).toBe(true);
+    expect((await call('reports/summary?from=2026-11-01&to=2026-10-01')).status).toBe(400);
+    expect((await call('reports/summary','GET',undefined,`ll_session=${'b'.repeat(64)}`)).status).toBe(403);
+    const payments=await (await call('payments?from=2026-10-01&to=2026-10-01&pageSize=1')).json();expect(payments.total).toBe(2);expect(payments.items).toHaveLength(1);
+  });
+
 });
