@@ -3,16 +3,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import pg from "pg";
 
-if (existsSync(".env.local")) process.loadEnvFile(".env.local");
-if (!process.env.DATABASE_URL) throw new Error("Set DATABASE_URL in .env.local or the environment first");
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
-await client.connect();
+export async function migrate(client, directory = "db/migrations") {
 try {
   await client.query("SELECT pg_advisory_lock(809031)");
   await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())");
-  const files = (await readdir("db/migrations")).filter((name) => name.endsWith(".sql")).sort();
+  const files = (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort();
   for (const name of files) {
-    const sql = await readFile(`db/migrations/${name}`, "utf8");
+    const sql = await readFile(`${directory}/${name}`, "utf8");
     const checksum = createHash("sha256").update(sql).digest("hex");
     const existing = await client.query("SELECT checksum FROM schema_migrations WHERE name=$1", [name]);
     if (existing.rowCount) {
@@ -31,7 +28,12 @@ try {
       throw error;
     }
   }
-} finally {
-  await client.query("SELECT pg_advisory_unlock(809031)").catch(() => {});
-  await client.end();
+} finally { await client.query("SELECT pg_advisory_unlock(809031)").catch(() => {}); }
+}
+if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
+  if (existsSync(".env.local")) process.loadEnvFile(".env.local");
+  if (!process.env.DATABASE_URL) throw new Error("Set DATABASE_URL first");
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try { await migrate(client); } finally { await client.end(); }
 }

@@ -9,6 +9,17 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: loopledger
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: loopledger_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U loopledger -d loopledger_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,3 +30,4 @@ jobs:
       - run: npm run check
         env:
           NEXT_PUBLIC_DATA_MODE: mock
+          DB_TEST_URL: postgresql://loopledger:disposable-ci-only@localhost:5432/loopledger_test
