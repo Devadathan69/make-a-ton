@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
 import { ActionConfirmDialog } from "./action-confirm-dialog";
 import { BillingEstimateModal } from "./billing-estimate-modal";
+import { useDialog } from "@/components/use-dialog";
 import styles from "./subscriptions.module.css";
 
 interface SubscriptionDetailDrawerProps {
@@ -15,7 +16,7 @@ interface SubscriptionDetailDrawerProps {
   onEditDraft?: (sub: Subscription) => void;
 }
 
-export function SubscriptionDetailDrawer({
+function SubscriptionDetail({
   subscriptionId,
   onClose,
   onRefreshList,
@@ -75,6 +76,8 @@ export function SubscriptionDetailDrawer({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [confirmingAction, isEstimateOpen, onClose]);
 
+  const dialogId = useDialog(Boolean(subscriptionId), onClose, transitioning);
+
   if (!subscriptionId) return null;
 
   // Execute transition
@@ -89,6 +92,7 @@ export function SubscriptionDetailDrawer({
       setConfirmingAction(null);
       onRefreshList();
     } catch (err: unknown) {
+      setConfirmingAction(null);
       if (err instanceof ApiError) {
         setTransitionError(err.message);
       } else if (err instanceof Error) {
@@ -102,7 +106,7 @@ export function SubscriptionDetailDrawer({
   };
 
   const handleActionClick = (action: SubscriptionAction) => {
-    if (action === "pause" || action === "close") {
+    if (action === "pause" || action === "close" || action === "resume") {
       setConfirmingAction(action);
     } else {
       executeTransition(action);
@@ -129,7 +133,7 @@ export function SubscriptionDetailDrawer({
         if (e.target === e.currentTarget && !transitioning) onClose();
       }}
     >
-      <div className={styles.drawer} role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div className={styles.drawer} data-dialog-root={dialogId} role="dialog" aria-modal="true" aria-labelledby="drawer-title">
         <div className={styles.drawerHeader}>
           <div className={styles.drawerTitleGroup}>
             <span className="eyebrow" style={{ fontSize: 9 }}>
@@ -214,6 +218,7 @@ export function SubscriptionDetailDrawer({
                 </div>
               </div>
 
+              <p className="state">Confirmed prices and taxes are fixed. Resume starts a fresh cycle without refunds; finite expiry must align with the new cycle. Already issued invoices remain collectible.</p>
               {/* Action Controls from allowedActions ONLY */}
               <div className={styles.lineItemsBox} style={{ background: "#fcfdfc" }}>
                 <div className={styles.lineItemsHeader}>
@@ -383,7 +388,7 @@ export function SubscriptionDetailDrawer({
       />
 
       {/* Billing Estimate Modal */}
-      {subscription && (
+      {subscription && isEstimateOpen && (
         <BillingEstimateModal
           isOpen={isEstimateOpen}
           subscriptionId={subscription.id}
@@ -393,4 +398,8 @@ export function SubscriptionDetailDrawer({
       )}
     </div>
   );
+}
+
+export function SubscriptionDetailDrawer(props: SubscriptionDetailDrawerProps) {
+  return props.subscriptionId ? <SubscriptionDetail key={props.subscriptionId} {...props} /> : null;
 }

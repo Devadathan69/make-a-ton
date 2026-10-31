@@ -481,6 +481,7 @@ export function ProductsPage() {
       </div>
 
       <Dialog
+        busy={submitting}
         isOpen={isDialogOpen}
         onClose={closeDialog}
         title={

@@ -188,3 +188,6 @@ describe("Catalog Utils & Validation", () => {
     });
   });
 });
+
+it("preserves every paise when reopening a maximum safe amount", () => { expect(paiseToInputString(Number.MAX_SAFE_INTEGER)).toBe("90071992547409.91"); });
+it("rejects dates normalized into a different month", () => {expect(isValidDateString("2026-02-31")).toBe(false);});

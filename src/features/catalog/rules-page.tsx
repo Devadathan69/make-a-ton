@@ -71,6 +71,8 @@ const initialDiscountData: DiscountFormData = {
 };
 
 export function RulesPage() {
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [referenceRevision, setReferenceRevision] = useState(0);
   const [role, setRole] = useState<Role | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
@@ -108,23 +110,26 @@ export function RulesPage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      api.session.get().catch(() => null),
-      api.products.list({ pageSize: 100 }).catch(() => ({ items: [] })),
+      api.session.get(),
+      api.products.list({ pageSize: 100 }),
     ]).then(([session, prodRes]) => {
       if (!cancelled) {
+        setReferenceError(null);
         setRole(session?.user?.role ?? null);
         setRoleLoading(false);
         if (prodRes?.items) {
           setProductList(prodRes.items);
         }
       }
+    }).catch((error: unknown) => {
+      if (!cancelled) { setReferenceError(error instanceof Error ? error.message : "Reference data unavailable"); setRoleLoading(false); }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [referenceRevision]);
 
-  const isAdmin = !roleLoading && role === "ADMIN";
+  const isAdmin = !roleLoading && role === "ADMIN" && !referenceError;
 
   // Load Taxes and Discounts
   const loadRules = useCallback(async () => {
@@ -397,6 +402,7 @@ export function RulesPage() {
 
   return (
     <>
+      {referenceError && <div role="alert" className="state state-error">Reference data could not be loaded: {referenceError} <button type="button" className="button button-secondary" onClick={() => setReferenceRevision(n => n + 1)}>Retry reference data</button></div>}
       <PageHeader
         eyebrow="Catalog / Rules"
         title="Every charge, explained."
@@ -706,6 +712,7 @@ export function RulesPage() {
 
       {/* Tax Dialog */}
       <Dialog
+        busy={taxSubmitting}
         isOpen={isTaxDialogOpen}
         onClose={() => setIsTaxDialogOpen(false)}
         title={
@@ -831,6 +838,7 @@ export function RulesPage() {
 
       {/* Discount Dialog */}
       <Dialog
+        busy={discountSubmitting}
         isOpen={isDiscountDialogOpen}
         onClose={() => setIsDiscountDialogOpen(false)}
         title={

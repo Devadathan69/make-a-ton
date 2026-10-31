@@ -1,5 +1,6 @@
 "use client";
 
+import { useDialog } from "@/components/use-dialog";
 import styles from "./subscriptions.module.css";
 import type { SubscriptionAction } from "@/lib/contracts";
 
@@ -20,26 +21,29 @@ export function ActionConfirmDialog({
   onCancel,
   loading,
 }: ActionConfirmDialogProps) {
+  const dialogId = useDialog(isOpen && Boolean(action), onCancel, loading);
+
   if (!isOpen || !action) return null;
 
   const isPause = action === "pause";
   const isClose = action === "close";
+  const isResume = action === "resume";
 
   const title = isPause
     ? `Pause Subscription ${subscriptionNumber}?`
     : isClose
     ? `Close Subscription ${subscriptionNumber}?`
-    : `Confirm Action: ${action}`;
+    : isResume ? `Resume Subscription ${subscriptionNumber}?` : `Confirm Action: ${action}`;
 
   const description = isPause
     ? "Pausing this subscription will hold future recurring billing cycles from generating invoices until resumed. Any previously issued invoices remain collectible."
     : isClose
     ? "Closing this subscription terminates the contract. Early closure is governed by the subscription plan's policy, and future billing will cease permanently."
-    : `Are you sure you want to proceed with the "${action}" transition?`;
+    : isResume ? "Resume starts a fresh billing cycle today. Unused paid time is not refunded. A finite expiry must align with the new billing anchor; the server validates the boundary." : `Are you sure you want to proceed with the "${action}" transition?`;
 
   return (
     <div className={styles.modalBackdrop} onClick={(e) => { if (e.target === e.currentTarget && !loading) onCancel(); }}>
-      <div className={styles.modalDialog} role="alertdialog" aria-modal="true" aria-labelledby="confirm-action-title">
+      <div className={styles.modalDialog} data-dialog-root={dialogId} role="alertdialog" aria-modal="true" aria-labelledby="confirm-action-title">
         <div className={styles.modalHeader}>
           <h2 id="confirm-action-title">{title}</h2>
           <button

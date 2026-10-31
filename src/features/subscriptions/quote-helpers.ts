@@ -8,7 +8,7 @@ export function cloneLines(lines: LineInput[]): LineInput[] {
   return lines.map((line) => ({
     productId: line.productId,
     variantId: line.variantId,
-    quantity: Math.max(1, Math.floor(line.quantity || 1)),
+    quantity: line.quantity,
     taxIds: Array.isArray(line.taxIds) ? [...line.taxIds] : [],
   }));
 }

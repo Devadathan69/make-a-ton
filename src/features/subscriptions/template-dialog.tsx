@@ -5,6 +5,7 @@ import type { Plan, Product, QuoteTemplate, TaxRule, TemplateInput, LineInput } 
 import { api, ApiError } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { cloneLines, getIndicativeSubtotal, sanitizeLineVariant } from "./quote-helpers";
+import { useDialog } from "@/components/use-dialog";
 import styles from "./subscriptions.module.css";
 
 interface TemplateDialogProps {
@@ -84,6 +85,8 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, submitting, onClose]);
 
+  const dialogId = useDialog(isOpen, onClose, submitting);
+
   if (!isOpen) return null;
 
   const handleAddLine = () => {
@@ -125,7 +128,7 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
   const handleQuantityChange = (index: number, qty: number) => {
     setLines((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], quantity: Math.max(1, Math.floor(qty || 1)) };
+      next[index] = { ...next[index], quantity: qty };
       return next;
     });
   };
@@ -163,7 +166,7 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
         if (!line.productId) {
           nextErrors[`line_${idx}`] = "Product is required";
         }
-        if (!line.quantity || line.quantity <= 0) {
+        if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) {
           nextErrors[`line_qty_${idx}`] = "Quantity must be a positive integer";
         }
       });
@@ -220,7 +223,7 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
     >
       <div
         className={`${styles.modalDialog} ${styles.modalDialogWide}`}
-        role="dialog"
+        data-dialog-root={dialogId} role="dialog"
         aria-modal="true"
         aria-labelledby="template-dialog-title"
       >
@@ -398,7 +401,7 @@ export function TemplateDialog({ isOpen, template, onClose, onSuccess }: Templat
                               min={1}
                               className={styles.formInput}
                               value={line.quantity}
-                              onChange={(e) => handleQuantityChange(idx, parseInt(e.target.value, 10))}
+                              onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
                               disabled={submitting}
                               aria-label={`Quantity for line ${idx + 1}`}
                             />

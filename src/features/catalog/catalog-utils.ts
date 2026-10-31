@@ -70,9 +70,9 @@ export function parseRupeesToPaise(input: string): ValidationResult<number> {
 
 /** Converts integer paise to a plain rupee string for form inputs (e.g. 56000 -> "560", 56050 -> "560.50"). */
 export function paiseToInputString(paise: number): string {
-  const rupees = paise / 100;
-  if (paise % 100 === 0) return rupees.toFixed(0);
-  return rupees.toFixed(2);
+  const amount = BigInt(paise);
+  const fraction = (amount % 100n).toString().padStart(2, "0");
+  return `${amount / 100n}${fraction === "00" ? "" : `.${fraction}`}`;
 }
 
 export const formatPaiseToRupees = paiseToInputString;
@@ -81,5 +81,5 @@ export const formatPaiseToRupees = paiseToInputString;
 export function isValidDateString(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
   const d = new Date(dateStr);
-  return !Number.isNaN(d.getTime());
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === dateStr;
 }

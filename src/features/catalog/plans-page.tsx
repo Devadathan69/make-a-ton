@@ -48,6 +48,8 @@ const initialPlanData: PlanFormData = {
 };
 
 export function PlansPage() {
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [referenceRevision, setReferenceRevision] = useState(0);
   const [role, setRole] = useState<Role | null>(null);
   const [roleLoading, setRoleLoading] = useState(true);
 
@@ -72,23 +74,26 @@ export function PlansPage() {
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      api.session.get().catch(() => null),
-      api.taxes.list({ pageSize: 100 }).catch(() => ({ items: [] })),
+      api.session.get(),
+      api.taxes.list({ pageSize: 100 }),
     ]).then(([session, taxesRes]) => {
       if (!cancelled) {
+        setReferenceError(null);
         setRole(session?.user?.role ?? null);
         setRoleLoading(false);
         if (taxesRes?.items) {
           setTaxesList(taxesRes.items);
         }
       }
+    }).catch((error: unknown) => {
+      if (!cancelled) { setReferenceError(error instanceof Error ? error.message : "Reference data unavailable"); setRoleLoading(false); }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [referenceRevision]);
 
-  const isAdmin = !roleLoading && role === "ADMIN";
+  const isAdmin = !roleLoading && role === "ADMIN" && !referenceError;
 
   // Load plans list
   const loadPlans = useCallback(() => {
@@ -259,6 +264,7 @@ export function PlansPage() {
 
   return (
     <>
+      {referenceError && <div role="alert" className="state state-error">Reference data could not be loaded: {referenceError} <button type="button" className="button button-secondary" onClick={() => setReferenceRevision(n => n + 1)}>Retry reference data</button></div>}
       <PageHeader
         eyebrow="Catalog / Plans"
         title="A plan for every cycle."
@@ -466,6 +472,7 @@ export function PlansPage() {
       </div>
 
       <Dialog
+        busy={submitting}
         isOpen={isDialogOpen}
         onClose={closeDialog}
         title={

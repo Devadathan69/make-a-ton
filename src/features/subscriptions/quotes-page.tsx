@@ -44,7 +44,8 @@ export function QuotesPage() {
   const templatesLoader = useCallback(() => api.templates.list({ pageSize: 100 }), []);
   const templatesResource = useResource(templatesLoader);
 
-  const todayStr = getTodayDateString();
+  const sessionResource = useResource(useCallback(() => api.session.get(), []));
+  const todayStr = sessionResource.data?.asOf ?? getTodayDateString();
 
   const handleStartNewQuote = (template?: QuoteTemplate) => {
     setDraftToContinue(null);
@@ -312,10 +313,10 @@ export function QuotesPage() {
       {/* Tab 2: Quotation Composer */}
       {activeTab === "composer" && (
         <Panel
-          title={draftToContinue ? `Edit Draft (${draftToContinue.number})` : "Compose New Quotation"}
+          title={draftToContinue ? `Edit ${draftToContinue.status.toLowerCase()} (${draftToContinue.number})` : "Compose New Quotation"}
           aside={
             draftToContinue ? (
-              <span className="badge badge-quotation">Editing Draft</span>
+              <span className="badge badge-quotation">Editing {draftToContinue.status.toLowerCase()}</span>
             ) : (
               <small>Creates an independent draft and transitions to quotation</small>
             )

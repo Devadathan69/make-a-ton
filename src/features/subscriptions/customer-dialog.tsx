@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Customer, CustomerInput } from "@/lib/contracts";
 import { api, ApiError } from "@/lib/api";
+import { useDialog } from "@/components/use-dialog";
 import styles from "./subscriptions.module.css";
 
 interface CustomerDialogProps {
@@ -55,6 +56,8 @@ export function CustomerDialog({ isOpen, customer, onClose, onSuccess }: Custome
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, submitting, onClose]);
+
+  const dialogId = useDialog(isOpen, onClose, submitting);
 
   if (!isOpen) return null;
 
@@ -129,7 +132,7 @@ export function CustomerDialog({ isOpen, customer, onClose, onSuccess }: Custome
     >
       <div
         className={styles.modalDialog}
-        role="dialog"
+        data-dialog-root={dialogId} role="dialog"
         aria-modal="true"
         aria-labelledby="customer-dialog-title"
       >

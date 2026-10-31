@@ -57,7 +57,7 @@ export function CustomersPage() {
       <PageHeader
         eyebrow="Workspace / Customers"
         title="Good relationships start here."
-        description="A shared customer directory for your subscription team. Create and manage customer accounts."
+        description="A shared customer directory for your subscription team. Create and manage business contact records. Login accounts are provisioned separately."
         action={
           <button type="button" className="button" onClick={handleOpenCreate}>
             + New Customer

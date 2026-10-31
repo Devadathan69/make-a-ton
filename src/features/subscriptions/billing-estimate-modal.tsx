@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Invoice } from "@/lib/contracts";
 import { api, ApiError } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/format";
+import { useDialog } from "@/components/use-dialog";
 import styles from "./subscriptions.module.css";
 
 interface BillingEstimateModalProps {
@@ -70,13 +71,15 @@ export function BillingEstimateModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  const dialogId = useDialog(isOpen, onClose, false);
+
   if (!isOpen) return null;
 
   return (
     <div className={styles.modalBackdrop} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         className={`${styles.modalDialog} ${styles.modalDialogWide}`}
-        role="dialog"
+        data-dialog-root={dialogId} role="dialog"
         aria-modal="true"
         aria-labelledby="estimate-modal-title"
       >

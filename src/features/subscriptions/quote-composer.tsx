@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { Customer, LineInput, Plan, Product, QuoteTemplate, Subscription, SubscriptionInput, TaxRule } from "@/lib/contracts";
 import { api, ApiError } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
@@ -15,6 +15,8 @@ interface QuoteComposerProps {
 }
 
 export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCancel }: QuoteComposerProps) {
+  const [initial] = useState(() => ({draft: initialDraft, templateId: initialTemplateId, date: initialDraft?.startDate ?? getTodayDateString()}));
+  const initialized = useRef(false);
   // Lookups
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [templates, setTemplates] = useState<QuoteTemplate[]>([]);
@@ -64,17 +66,17 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
       setProducts(prodRes.items.filter((p) => p.active));
       setTaxes(taxRes.items.filter((t) => t.active));
 
-      if (initialTemplateId) {
-        const tmpl = tmplRes.items.find((t) => t.id === initialTemplateId);
+      if (!initialized.current && initial.templateId) {
+        const tmpl = tmplRes.items.find((t) => t.id === initial.templateId);
         if (tmpl) {
           setSelectedPlanId(tmpl.planId);
           setLines(cloneLines(tmpl.lines));
           if (tmpl.validDays > 0) {
-            setQuotationValidUntil(addDays(startDate, tmpl.validDays));
+            setQuotationValidUntil(addDays(initial.date, tmpl.validDays));
           }
         }
-      } else if (!initialDraft && lines.length === 0 && prodRes.items.length > 0) {
-        const firstProd = prodRes.items[0];
+      } else if (!initialized.current && !initial.draft && prodRes.items.some(p => p.active)) {
+        const firstProd = prodRes.items.find(p => p.active)!;
         setLines([
           {
             productId: firstProd.id,
@@ -84,12 +86,13 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
           },
         ]);
       }
+      initialized.current = true;
     } catch (err: unknown) {
       setLookupsError(err instanceof Error ? err.message : "Failed to load reference selectors");
     } finally {
       setLookupsLoading(false);
     }
-  }, [initialDraft, initialTemplateId, lines.length, startDate]);
+  }, [initial]);
 
   useEffect(() => {
     fetchLookups();
@@ -162,7 +165,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
   const handleQuantityChange = (index: number, qty: number) => {
     setLines((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], quantity: Math.max(1, Math.floor(qty || 1)) };
+      next[index] = { ...next[index], quantity: qty };
       return next;
     });
   };
@@ -191,15 +194,12 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
     if (!selectedPlanId) nextErrors.planId = "Plan is required";
     if (!startDate) nextErrors.startDate = "Start date is required";
     if (!quotationValidUntil) nextErrors.quotationValidUntil = "Quotation validity date is required";
-    if (startDate && quotationValidUntil && quotationValidUntil < startDate) {
-      nextErrors.quotationValidUntil = "Quotation validity date cannot be before start date";
-    }
     if (lines.length === 0) {
       nextErrors.lines = "Quotation must have at least one product line";
     } else {
       lines.forEach((line, idx) => {
         if (!line.productId) nextErrors[`line_prod_${idx}`] = "Product is required";
-        if (!line.quantity || line.quantity <= 0) nextErrors[`line_qty_${idx}`] = "Quantity must be positive";
+        if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) nextErrors[`line_qty_${idx}`] = "Quantity must be positive";
       });
     }
 
@@ -210,6 +210,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
   // Transition retry handler
   const handleRetryTransition = async () => {
     if (!savedDraft) return;
+    if (savedDraft.status !== "DRAFT") { onSuccess(savedDraft); return; }
     setTransitioning(true);
     setTransitionError(null);
     try {
@@ -255,8 +256,8 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
       } else {
         // Creating new draft
         createdSub = await api.subscriptions.create(payload);
-        setSavedDraft(createdSub);
       }
+      setSavedDraft(createdSub);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setGlobalError(err.message);
@@ -271,6 +272,8 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
     }
 
     setSubmitting(false);
+
+    if (createdSub && createdSub.status !== "DRAFT") { onSuccess(createdSub); return; }
 
     // Explicit second step: Transition to QUOTATION
     if (createdSub) {
@@ -343,6 +346,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
         </div>
       )}
 
+      <p className="state">Confirmation fixes the contract prices and tax rates. Finite expiry must be a billing boundary. Pausing stops future unissued periods; resuming starts a fresh cycle with no refund of unused time.</p>
       <form onSubmit={handleSubmit} noValidate>
         <div className={styles.formGrid}>
           {/* Top row: Customer & Template */}
@@ -567,7 +571,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
                           min={1}
                           className={styles.formInput}
                           value={line.quantity}
-                          onChange={(e) => handleQuantityChange(idx, parseInt(e.target.value, 10))}
+                          onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
                           disabled={submitting || transitioning}
                         >
                         </input>
@@ -645,7 +649,7 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
             Cancel
           </button>
 
-          {savedDraft && (
+          {savedDraft?.status === "DRAFT" && (
             <button
               type="button"
               className="button button-secondary"
@@ -659,12 +663,14 @@ export function QuoteComposer({ initialDraft, initialTemplateId, onSuccess, onCa
           <button
             type="submit"
             className="button"
-            disabled={submitting || transitioning}
+            disabled={submitting || transitioning || lookupsLoading || Boolean(lookupsError)}
           >
             {submitting
               ? "Saving Draft..."
               : transitioning
               ? "Transitioning to Quote..."
+              : savedDraft?.status === "QUOTATION"
+              ? "Save quotation"
               : savedDraft
               ? "Update Draft & Send Quote"
               : "Create Draft & Send Quote"}

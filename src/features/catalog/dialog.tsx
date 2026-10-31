@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { useDialog } from "@/components/use-dialog";
 import styles from "./catalog.module.css";
 
 interface DialogProps {
@@ -10,6 +11,7 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   id?: string;
+  busy?: boolean;
 }
 
 export function Dialog({
@@ -19,44 +21,9 @@ export function Dialog({
   description,
   children,
   id = "catalog-dialog",
+  busy = false,
 }: DialogProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      previouslyFocusedElementRef.current = document.activeElement as HTMLElement | null;
-      // Focus the dialog container or first focusable element
-      const timer = setTimeout(() => {
-        if (dialogRef.current) {
-          const focusable = dialogRef.current.querySelector<HTMLElement>(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-          );
-          if (focusable) {
-            focusable.focus();
-          } else {
-            dialogRef.current.focus();
-          }
-        }
-      }, 50);
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          onClose();
-        }
-      };
-
-      document.addEventListener("keydown", handleKeyDown);
-      return () => {
-        clearTimeout(timer);
-        document.removeEventListener("keydown", handleKeyDown);
-        if (previouslyFocusedElementRef.current) {
-          previouslyFocusedElementRef.current.focus();
-        }
-      };
-    }
-  }, [isOpen, onClose]);
+  const dialogId = useDialog(isOpen, onClose, busy);
 
   if (!isOpen) return null;
 
@@ -67,13 +34,13 @@ export function Dialog({
     <div
       className={styles.modalBackdrop}
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
+        if (e.target === e.currentTarget && !busy) {
           onClose();
         }
       }}
     >
       <div
-        ref={dialogRef}
+        data-dialog-root={dialogId}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -91,6 +58,7 @@ export function Dialog({
             className={styles.closeButton}
             onClick={onClose}
             aria-label="Close dialog"
+            disabled={busy}
           >
             ×
           </button>

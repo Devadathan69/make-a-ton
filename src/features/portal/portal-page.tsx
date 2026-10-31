@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Invoice, Session, Subscription, SubscriptionAction } from "@/lib/contracts";
 import { formatDate, formatMoney } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
+import { useDialog } from "@/components/use-dialog";
 import styles from "./portal.module.css";
 
 const SELF_SERVICE_ACTIONS: SubscriptionAction[] = ["pause", "resume", "renew", "close"];
@@ -49,7 +50,7 @@ export function PortalPage() {
   const { data, loading, error, refresh } = useResource(loader);
 
   const handleSelfServiceClick = (sub: Subscription, action: SubscriptionAction) => {
-    if (action === "pause" || action === "close") {
+    if (action === "pause" || action === "close" || action === "resume") {
       setConfirmDialog({
         subId: sub.id,
         subNumber: sub.number,
@@ -70,6 +71,7 @@ export function PortalPage() {
       setConfirmDialog(null);
       refresh();
     } catch (err: unknown) {
+      setConfirmDialog(null);
       if (err instanceof ApiError) {
         setActionError(err.message);
       } else if (err instanceof Error) {
@@ -93,6 +95,9 @@ export function PortalPage() {
     }
   };
 
+  const confirmId = useDialog(Boolean(confirmDialog), () => setConfirmDialog(null), Boolean(actionPendingSubId));
+  const docId = useDialog(Boolean(mockDocNotice), () => setMockDocNotice(null));
+  const invoiceId = useDialog(Boolean(selectedInvoice), () => setSelectedInvoice(null));
   const isMock = data?.session.mode === "mock";
   const user = data?.session.user;
 
@@ -361,18 +366,18 @@ export function PortalPage() {
               width: "100%",
               boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
             }}
-            role="alertdialog"
+            data-dialog-root={confirmId} role="alertdialog" aria-label="Confirm subscription action"
             aria-modal="true"
           >
             <h3 style={{ fontSize: 17, marginBottom: 12 }}>
               {confirmDialog.action === "pause"
                 ? `Pause ${confirmDialog.subNumber}?`
-                : `Close ${confirmDialog.subNumber}?`}
+                : confirmDialog.action === "resume" ? `Resume ${confirmDialog.subNumber}?` : `Close ${confirmDialog.subNumber}?`}
             </h3>
             <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted)", marginBottom: 16 }}>
               {confirmDialog.action === "pause"
-                ? "Pausing will temporarily hold future automatic billing periods. Your service remains active until the end of the paid cycle. You can resume at any time."
-                : "Closing terminates this subscription contract. You will not be billed for subsequent cycles. Early closure rules apply as per your plan."}
+                ? "Pausing stops future unissued billing periods. Issued invoices remain collectible. Resume starts a fresh cycle without a refund; finite expiry must align with the new anchor."
+                : confirmDialog.action === "resume" ? "Resume starts a fresh billing cycle today. Unused paid time is not refunded. Finite expiry must align with the new anchor; the server may reject an incompatible date." : "Closing terminates this subscription contract. You will not be billed for subsequent cycles. Early closure rules apply as per your plan."}
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
@@ -422,7 +427,7 @@ export function PortalPage() {
               maxWidth: 480,
               width: "100%",
             }}
-            role="dialog"
+            data-dialog-root={docId} role="dialog" aria-label="Invoice document notice"
           >
             <h3 style={{ fontSize: 16, marginBottom: 8 }}>Invoice Document Notice</h3>
             <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--ink)", marginBottom: 16 }}>
@@ -468,7 +473,7 @@ export function PortalPage() {
               maxHeight: "90vh",
               overflowY: "auto",
             }}
-            role="dialog"
+            data-dialog-root={invoiceId} role="dialog" aria-label="Invoice breakdown"
           >
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <div>

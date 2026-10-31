@@ -35,7 +35,7 @@ try {
   }
   await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.waitForURL('**/login');
   await login(staffEmail);await page.waitForURL('**/dashboard');await page.getByText('Active subscriptions',{exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Staff accounts',exact:true}).count(),0);await page.goto(new URL('/settings/staff',base).href);await page.waitForURL('**/dashboard');await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.waitForURL('**/login');
-  await login('ananya@example.test');await page.waitForURL('**/portal');await page.getByRole('heading',{name:'My invoices'}).waitFor();
+  await login('ananya@example.test');await page.waitForURL('**/portal');await page.getByRole('heading',{name:'Billing & Invoices'}).waitFor();
   assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).count(),0);
   await page.goto(new URL('/catalog/products',base).href);await page.waitForURL('**/portal');
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'output/browser/portal-mobile.png',fullPage:true});
