@@ -18,7 +18,7 @@ function queryString(query?: object): string {
 export async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     method, credentials: "same-origin", cache: "no-store",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(method === "GET" ? {} : { "X-LoopLedger-CSRF": "1" }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   if (!response.ok) {
