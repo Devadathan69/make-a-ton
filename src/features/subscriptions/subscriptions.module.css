@@ -650,3 +650,11 @@
     align-self: flex-end;
   }
 }
+
+@media (max-width: 720px) {
+  .tabsBar {flex-wrap:wrap;padding:0;max-width:100%;}
+  .tabBtn {flex:1 1 100px;min-width:0;padding:12px 8px;justify-content:center;}
+  .searchGroup {min-width:0;}
+  .searchInput {min-width:0;width:100%;}
+  .toolbarActions,.pagination {flex-wrap:wrap;gap:10px;}
+}

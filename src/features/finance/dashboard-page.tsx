@@ -43,10 +43,11 @@ export function DashboardPage() {
 
   const handlePreset = (preset: "this-month" | "last-30" | "ytd" | "all") => {
     setDateError(null);
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
+    if (!data) return;
+    const now = new Date(`${data.asOf}T00:00:00Z`);
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(now.getUTCDate()).padStart(2, "0");
     const todayStr = `${year}-${month}-${day}`;
 
     if (preset === "all") {
@@ -65,8 +66,8 @@ export function DashboardPage() {
     }
 
     if (preset === "last-30") {
-      const past = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const pastFrom = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, "0")}-${String(past.getDate()).padStart(2, "0")}`;
+      const past = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+      const pastFrom = `${past.getUTCFullYear()}-${String(past.getUTCMonth() + 1).padStart(2, "0")}-${String(past.getUTCDate()).padStart(2, "0")}`;
       setFromDate(pastFrom);
       setToDate(todayStr);
       setAppliedFilters({ from: pastFrom, to: todayStr });
@@ -94,7 +95,7 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Workspace / Overview"
         title="Finance & Billing Dashboard"
-        description="Comprehensive summary of contracts, billings, cash collections, and outstanding liabilities."
+        description="Comprehensive summary of contracts, billings, cash collections, and current customer balances."
         action={
           <div style={{ display: "flex", gap: "10px" }}>
             <button
@@ -156,7 +157,7 @@ export function DashboardPage() {
             className={`${styles.presetButton} ${!hasActiveFilter ? styles.activePreset : ""}`}
             onClick={() => handlePreset("all")}
           >
-            All time
+            Default period
           </button>
           <button
             type="button"
@@ -204,6 +205,7 @@ export function DashboardPage() {
       </form>
 
       <ResourceState loading={loading} error={error} />
+      {error && <button type="button" className="button" onClick={refresh}>Retry report</button>}
 
       {data && (
         <>
@@ -229,6 +231,7 @@ export function DashboardPage() {
               <p className={styles.statNote}>
                 Total confirmed & paid invoices issued in selected range (includes taxes)
               </p>
+              <Link className="text-link" href={`/invoices?${new URLSearchParams(Object.entries(appliedFilters).filter((entry): entry is [string,string] => Boolean(entry[1])))}`}>View period invoices →</Link>
             </div>
 
             <div className={styles.statCard}>
@@ -283,6 +286,7 @@ export function DashboardPage() {
               aside={<small>As of {formatDate(data.asOf)}</small>}
             >
               <div className={styles.chartContainer}>
+                {data.monthly.every(month => month.billed === 0 && month.collected === 0) && <p className="state">No billing or collection activity in this period.</p>}
                 {/* Accessible Hidden Summary for Screen Readers */}
                 <div className={styles.accessibleSummary}>
                   <table>
@@ -371,12 +375,12 @@ export function DashboardPage() {
               ) : (
                 <div className="attention-list">
                   {data.attention.map((item) => (
-                    <div className={styles.attentionItem} key={item.id}>
+                    <div className={styles.attentionItem} key={`${item.kind}:${item.id}`}>
                       <div className={styles.attentionHeader}>
                         <Badge value={item.kind} />
                       </div>
                       <p className={styles.attentionTitle}>{item.title}</p>
-                      <Link className={styles.attentionLink} href={item.href}>
+                      <Link className={styles.attentionLink} href={item.kind === "OVERDUE" ? `/invoices?invoiceId=${encodeURIComponent(item.id)}` : item.href}>
                         Review record <span>→</span>
                       </Link>
                     </div>
