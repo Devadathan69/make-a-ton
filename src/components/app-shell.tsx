@@ -41,7 +41,7 @@ function WorkspaceShell({ children, pathname }: { children: ReactNode; pathname:
     <div className="main-column">
       <header className="topbar"><span>Brightloop <span className="breadcrumb-slash">/</span> Operations</span><div className="topbar-right"><span className="environment-tag">{dataMode === "mock" ? "Development fixtures" : "Connected API"}</span><span className="avatar" aria-label="Workspace">BL</span>{session && <button onClick={async () => { await request("/auth/logout", "POST", {}); router.replace("/login"); }}>Sign out</button>}</div></header>
       {session?.demoClock && <div className="mock-banner"><strong>SIMULATION</strong><span>Isolated demo date: {session.asOf} · Asia/Kolkata</span></div>}
-      {dataMode === "mock" && <div className="mock-banner"><strong>Starter preview</strong><span>Sample records · browser-only edits reset on reload · billing and authentication are not implemented yet</span></div>}
+      {dataMode === "mock" && <div className="mock-banner"><strong>Starter preview</strong><span>Sample records · browser-only edits reset on reload · use connected mode for billing and authentication</span></div>}
       <main id="main-content">{children}</main>
       <footer className="main-footer"><span>LoopLedger / Make-A-Ton 2026</span><span>One place for every billing cycle.</span></footer>
     </div>

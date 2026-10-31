@@ -85,6 +85,8 @@ export interface DashboardSummary {
   attention: { id: string; kind: "OVERDUE" | "EXPIRING" | "BILLING_FAILURE"; title: string; href: string }[];
 }
 export interface BillingRunResult {
+  /** Due subscriptions remaining, including retryable failures; not a period count. */
+  remainingDue?: number;
   runId: string; generated: number; skipped: number; failed: number; asOf: string;
 }
 export interface CrudResource<T, I> {

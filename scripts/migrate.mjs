@@ -3,6 +3,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import pg from "pg";
 
+/** @param {Record<string, string | undefined>} [env] */
+export function migrationConnectionString(env = process.env) {
+  const value = env.MIGRATION_DATABASE_URL || env.DATABASE_URL_UNPOOLED || env.DATABASE_URL;
+  if (!value) throw new Error('Set MIGRATION_DATABASE_URL (direct/unpooled) first');
+  if (new URL(value).hostname.includes('-pooler')) throw new Error('Migrations use session advisory locks. Supply a direct/unpooled MIGRATION_DATABASE_URL; a pooler URL is not supported.');
+  return value;
+}
 export async function migrate(client, directory = "db/migrations") {
 try {
   await client.query("SELECT pg_advisory_lock(809031)");
@@ -32,8 +39,7 @@ try {
 }
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
   if (existsSync(".env.local")) process.loadEnvFile(".env.local");
-  if (!process.env.DATABASE_URL) throw new Error("Set DATABASE_URL first");
-  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  const client = new pg.Client({ connectionString: migrationConnectionString() });
   await client.connect();
   try { await migrate(client); } finally { await client.end(); }
 }

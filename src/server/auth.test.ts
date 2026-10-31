@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDecipheriv, randomBytes } from 'node:crypto';
 import { deliverOutbox } from './outbox';
 import { handle } from './router';
@@ -72,6 +72,27 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected authentication and permissi
     expect(reset.status).toBe(200);expect([200,401]).toContain(login.status);
     if(login.status===200)expect((await get('session',login.headers.get('set-cookie')!.split(';')[0])).status).toBe(401);
     expect((await fixture.db.query("SELECT count(*) FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.email='test@example.test'")).rows[0].count).toBe('0');
+  });
+
+  it('registers bounded reset delivery after response and keeps unknown accounts generic',async()=>{
+    const schedule=async(email:string)=>{
+      const tasks:(()=>Promise<void>)[]=[],sent:string[]=[];
+      const request=new Request('http://localhost:3000/api/v1/auth/forgot-password',{method:'POST',headers:{origin:'http://localhost:3000','Content-Type':'application/json','X-LoopLedger-CSRF':'1'},body:JSON.stringify({email})});
+      const response=await handle(request,['auth','forgot-password'],{defer:task=>tasks.push(task),dispatch:key=>deliverOutbox(async m=>{sent.push(m.to);},1,key)});
+      return {tasks,sent,response};
+    };
+    vi.stubEnv('EMAIL_DELIVERY_ENABLED','true');
+    try {
+      const known=await schedule('test@example.test'),unknown=await schedule('not-present@example.test');
+      expect(known.response.status).toBe(202);expect(await known.response.json()).toEqual(await unknown.response.json());
+      expect(known.sent).toEqual([]);expect(known.tasks).toHaveLength(1);expect(unknown.tasks).toHaveLength(1);
+      await known.tasks[0]();await unknown.tasks[0]();expect(known.sent).toEqual(['test@example.test']);expect(unknown.sent).toEqual([]);
+      const uncertainTasks:(()=>Promise<void>)[]=[];
+      const request=new Request('http://localhost:3000/api/v1/auth/forgot-password',{method:'POST',headers:{origin:'http://localhost:3000','Content-Type':'application/json','X-LoopLedger-CSRF':'1'},body:JSON.stringify({email:'test@example.test'})});
+      expect((await handle(request,['auth','forgot-password'],{defer:task=>uncertainTasks.push(task),dispatch:async()=>{throw new Error('Unpersisted send outcome');}})).status).toBe(202);
+      await uncertainTasks[0]();
+      expect((await fixture.db.query("SELECT delivery_state,next_attempt_at FROM outbox_messages WHERE kind='PASSWORD_RESET' ORDER BY created_at DESC LIMIT 1")).rows[0]).toEqual({delivery_state:'UNCERTAIN',next_attempt_at:null});
+    } finally {vi.unstubAllEnvs();}
   });
 
 });

@@ -2,10 +2,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { migrate } from '../../scripts/migrate.mjs';
+import { migrate, migrationConnectionString } from '../../scripts/migrate.mjs';
 
 const url = process.env.DB_TEST_URL;
 if (url && !/test|demo/.test(new URL(url).pathname)) throw new Error("Migration tests require a disposable demo/test database");
+it('requires a direct migration connection and prefers it over pooled runtime URLs',()=>{
+  const pooled='postgresql://example.invalid-pooler.neon.tech/demo';
+  const direct='postgresql://example.invalid.neon.tech/demo';
+  expect(()=>migrationConnectionString({DATABASE_URL:pooled})).toThrow('direct/unpooled');
+  expect(migrationConnectionString({DATABASE_URL:pooled,MIGRATION_DATABASE_URL:direct})).toBe(direct);
+  expect(migrationConnectionString({DATABASE_URL:pooled,DATABASE_URL_UNPOOLED:direct})).toBe(direct);
+  expect(migrationConnectionString({DATABASE_URL:'postgresql://localhost/demo'})).toBe('postgresql://localhost/demo');
+});
 // This suite creates an isolated schema, never drops an existing application schema.
 describe.skipIf(!url)('connected PostgreSQL migrations', () => {
   const schema=`test_${crypto.randomUUID().replaceAll('-','')}`;

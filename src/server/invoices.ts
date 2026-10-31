@@ -54,7 +54,7 @@ export async function invoiceAction(user:User,id:string,action:'confirm'|'cancel
     return invoiceDto(db,await invoiceRow(db,id),await effectiveDate(db));
   });
 }
-export async function invoicesRoute(request:Request,parts:string[],portal=false) {
+export async function invoicesRoute(request:Request,parts:string[],portal=false,onQueued?:(key:string|null)=>void) {
   const id=parts[1],user=await requireUser(request,portal?['CUSTOMER']:request.method==='GET'&&id?['ADMIN','STAFF','CUSTOMER']:['ADMIN','STAFF']),db=getPool(),asOf=await effectiveDate(db);
   if(request.method==='GET') {
     if(parts.length===3&&parts[2]==='document') {
@@ -79,7 +79,9 @@ export async function invoicesRoute(request:Request,parts:string[],portal=false)
   checkOrigin(request);
   if(request.method==='POST'&&parts.length===3&&parts[2]==='actions') {
     const {action}=z.object({action:z.enum(['confirm','cancel','send'])}).strict().parse(await body(request));
-    return Response.json(await invoiceAction(user,id,action));
+    const updated=await invoiceAction(user,id,action);
+    if(action==='send')onQueued?.(`invoice:${id}`);
+    return Response.json(updated);
   }
   throw new HttpError(405,'METHOD_NOT_ALLOWED','Unsupported method');
 }

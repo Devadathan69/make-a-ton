@@ -109,3 +109,13 @@ No feature-owner PRs were open at the last review. Their unfinished UI is an exp
 - Draft subscription lists now join plan policy fields in the paginated query; increasing page size from 1 to 20 adds no queries (connected regression test).
 - Contract resolution batches product/tax references and discount evaluation batches rules, avoiding per-line/per-rule network reads.
 - HTTP-mode check passes with 58 tests, lint, strict types and production build. This corrects an active-only performance blind spot; owner UI files remain unchanged.
+
+## Provider compatibility preparation
+
+- Proposed Vercel/Neon demo: GET/POST bearer-authenticated cron, soft billing time budget with remainingDue, a 300-second Fluid route ceiling, one-message scheduler email batch, and an awaited operator catch-up fallback.
+- Migration URLs are explicitly direct/unpooled; known pooler targets fail before connection. Runtime uses pooled pg with Vercel lifecycle management and transaction-local timeouts.
+- Reset/invoice-send use targeted awaited Next after callbacks after DB commit, so resets do not wait for daily cron or an invoice backlog. No detached promise or assumed continuously running server is used.
+- Inert vercel.example.json and docs/VERCEL_NEON.md explain Hobby daily timing, large backlog limitations and still-unverified deployment/email gates. Parent owns all provisioning/credentials/deploy actions.
+
+- Provider preparation passes 62 tests plus lint/types/HTTP build. Added checks cover direct-versus-pooled migration selection, GET cron authorization, zero-budget backlog retention, lifecycle-targeted reset/invoice delivery and conservative uncertainty handling.
+- Native Next after was exercised with SMTP explicitly unconfigured: invoice send returned QUEUED, the lifecycle callback persisted FAILED, and its 990000 total/400000 paid remained unchanged. No external SMTP connection was attempted. Vercel's actual lifecycle/SMTP acceptance is still a hosted verification gate.

@@ -1,3 +1,4 @@
+import { getDeadline } from '@vercel/functions';
 import { deliverOutbox } from '../outbox';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
@@ -6,19 +7,20 @@ import { getPool, one, transaction } from '../db';
 import { audit, billingInputs, discountRules, subscriptionRow } from '../subscriptions';
 import { getResource } from '../catalog';
 import { addDays, nextCycle } from '../dates';
-import { dateOnly } from '../values';
+import { dateOnly, safeInteger } from '../values';
 import { calculate } from './calculator';
 import { checkOrigin, requireUser } from '../auth';
 import { effectiveDate, demoEnabled } from '../clock';
 import { body, HttpError } from '../errors';
 
 /** Each period is one transaction; an error leaves that period due for retry. */
-export async function runDueBilling(asOf:string,limit=100):Promise<BillingRunResult> {
-  dateOnly.parse(asOf);z.number().int().min(1).max(500).parse(limit);
+export async function runDueBilling(asOf:string,limit=100,timeBudgetMs=20000):Promise<BillingRunResult> {
+  dateOnly.parse(asOf);z.number().int().min(1).max(500).parse(limit);z.number().int().min(0).max(240000).parse(timeBudgetMs);
+  const stopAt=Math.min(Date.now()+timeBudgetMs,(getDeadline()?.getTime()??Infinity)-10000);
   const runId=randomUUID(),result:BillingRunResult={runId,generated:0,skipped:0,failed:0,asOf},failedIds:string[]=[];
   await getPool().query("INSERT INTO billing_runs(id,as_of,status) VALUES($1,$2,'RUNNING')",[runId,asOf]);
   try {
-    for(let step=0;step<limit;step++) {
+    for(let step=0;step<limit&&Date.now()<stopAt;step++) {
       let candidate:{id:string;period:string}|undefined;
       try {
         const outcome=await transaction(async db=>{
@@ -69,6 +71,8 @@ export async function runDueBilling(asOf:string,limit=100):Promise<BillingRunRes
         await getPool().query('INSERT INTO billing_failures(id,run_id,subscription_id,period_start,message) VALUES($1,$2,$3,$4,$5)',[randomUUID(),runId,candidate.id,candidate.period,'Period failed and remains due. Retry after resolving validation or storage failure.']);
       }
     }
+    const remaining=await one<{count:string}>(getPool(),"SELECT count(*) FROM subscriptions WHERE (status='ACTIVE' AND next_billing_date<=$1::date) OR (status='CONFIRMED' AND start_date<=$1::date)",[asOf]);
+    result.remainingDue=safeInteger(remaining!.count);
     await getPool().query("UPDATE billing_runs SET status=$1,generated=$2,skipped=$3,failed=$4,completed_at=now() WHERE id=$5",[result.failed?'FAILED':'COMPLETED',result.generated,result.skipped,result.failed,runId]);
     return result;
   } catch(error) {
@@ -91,7 +95,7 @@ export async function billingRoute(request:Request,clock=false) {
   return Response.json(await runDueBilling(await effectiveDate()));
 }
 export async function schedulerRoute(request:Request) {
-  if(request.method!=='POST')throw new HttpError(405,'METHOD_NOT_ALLOWED','Use POST');
+  if(!['POST','GET'].includes(request.method))throw new HttpError(405,'METHOD_NOT_ALLOWED','Use GET or POST');
   const secret=process.env.CRON_SECRET;
   if(!secret||secret.length<32)throw new HttpError(503,'SCHEDULER_NOT_CONFIGURED','Scheduler is not configured');
   const supplied=request.headers.get('authorization')??'',expected=`Bearer ${secret}`;
@@ -99,6 +103,6 @@ export async function schedulerRoute(request:Request) {
   const throttle=await one<{attempts:number}>(getPool(),`INSERT INTO auth_throttles(bucket,attempts,resets_at) VALUES('scheduler',1,now()+interval '1 minute') ON CONFLICT(bucket) DO UPDATE SET attempts=CASE WHEN auth_throttles.resets_at<now() THEN 1 ELSE auth_throttles.attempts+1 END,resets_at=CASE WHEN auth_throttles.resets_at<now() THEN now()+interval '1 minute' ELSE auth_throttles.resets_at END RETURNING attempts`);
   if(throttle!.attempts>1)throw new HttpError(429,'THROTTLED','Retry after one minute');
   const billing=await runDueBilling(await effectiveDate(),500);
-  const email=process.env.EMAIL_DELIVERY_ENABLED==='true'?await deliverOutbox():{enabled:false};
+  const email=process.env.EMAIL_DELIVERY_ENABLED==='true'?await deliverOutbox(undefined,1):{enabled:false};
   return Response.json({...billing,email});
 }

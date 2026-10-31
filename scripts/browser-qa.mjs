@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { strict as assert } from 'node:assert';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE_PATH??'playwright');
@@ -41,9 +42,9 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false,'mobile page must not overflow');
   await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.waitForURL('**/login');
   await page.goto(new URL('/register',base).href);await page.getByLabel('Name',{exact:true}).fill('Local QA Customer');
-  await page.getByLabel('Email',{exact:true}).fill(`qa-${Date.now()}@example.test`);await page.getByLabel('Password',{exact:true}).fill(process.env.DEMO_PASSWORD);
+  await page.getByLabel('Email',{exact:true}).fill(`qa-${Date.now()}@example.test`);await page.getByLabel('Password',{exact:true}).fill('abcdefgh!');await page.getByRole('button',{name:'Create customer account',exact:true}).click();await page.getByRole('alert').filter({hasText:'uppercase'}).waitFor();await page.getByLabel('Password',{exact:true}).fill(process.env.DEMO_PASSWORD);
   await page.getByRole('button',{name:'Create customer account',exact:true}).click();await page.waitForURL('**/portal');
   assert.deepEqual(errors,[],'no browser runtime errors');
-  const evidence={environment:'local Chromium against HTTP production build; not deployed p95',viewport:'1440x1000 desktop; 390x844 mobile',checks:['anonymous redirect','admin login','admin staff provisioning','admin billing control','demo clock refresh','staff role denial','connected page render','logout','customer portal navigation isolation','internal-route denial','mobile overflow','customer registration'],measurements};
+  const evidence={commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim(),environment:'local Chromium against HTTP production build; not deployed p95',viewport:'1440x1000 desktop; 390x844 mobile',checks:['anonymous redirect','admin login','admin staff provisioning','admin billing control','demo clock refresh','staff role denial','connected page render','logout','customer portal navigation isolation','internal-route denial','mobile overflow','password policy feedback','customer registration'],measurements};
   await writeFile('output/browser/evidence.json',JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify(evidence,null,2));
 } finally {await context.close();await browser.close();}

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 const base=new URL(process.env.BENCHMARK_BASE_URL??'http://localhost:3000');
 if(!['localhost','127.0.0.1','[::1]'].includes(base.hostname))throw new Error('This benchmark is restricted to an authorized loopback demo. Deployed measurements require a separately approved target.');
@@ -5,7 +6,7 @@ if(!process.env.DEMO_PASSWORD)throw new Error('Supply the local fictitious DEMO_
 const login=await fetch(new URL('/api/v1/auth/login',base),{method:'POST',headers:{origin:base.origin,'Content-Type':'application/json','X-LoopLedger-CSRF':'1'},body:JSON.stringify({email:'admin@example.test',password:process.env.DEMO_PASSWORD})});
 if(!login.ok)throw new Error(`Demo login failed: ${login.status}`);
 const cookie=login.headers.get('set-cookie')?.split(';')[0];if(!cookie)throw new Error('No demo session');
-const results={environment:'local loopback HTTP production build; not deployed p95',samples:50,warmups:5,measuredAt:new Date().toISOString(),routes:[]};
+const results={commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{encoding:'utf8'}).trim(),environment:'local loopback HTTP production build; not deployed p95',samples:50,warmups:5,measuredAt:new Date().toISOString(),routes:[]};
 try {
   for(const path of ['/api/v1/subscriptions?pageSize=20','/api/v1/reports/summary','/api/v1/invoices?pageSize=20']) {
     const samples=[];let total;

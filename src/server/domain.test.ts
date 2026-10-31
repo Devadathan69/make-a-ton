@@ -194,7 +194,7 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     process.env.CRON_SECRET='fictitious-test-credential-'.repeat(2);
     expect((await call('scheduler/run','POST',{},'',{authorization:'Bearer incorrect'})).status).toBe(401);
     const headers={authorization:`Bearer ${process.env.CRON_SECRET}`};
-    expect((await call('scheduler/run','POST',{},'',headers)).status).toBe(200);
+    expect((await call('scheduler/run','GET',undefined,'',headers)).status).toBe(200);
     expect((await call('scheduler/run','POST',{},'',headers)).status).toBe(429);
   });
   it('holds uncertain SMTP acceptance for explicit reconciliation and exposes only safe outbox metadata',async()=>{
@@ -209,6 +209,22 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     expect((await deliverOutbox(async()=>{})).sent).toBe(1);
   });
 
+
+  it('targets immediate invoice delivery after response without draining another invoice first',async()=>{
+    const pending=(await fixture.db.query("SELECT id FROM invoices WHERE status='CONFIRMED' ORDER BY id LIMIT 1")).rows[0].id;
+    const tasks:(()=>Promise<void>)[]=[];let sends=0;
+    vi.stubEnv('EMAIL_DELIVERY_ENABLED','true');
+    try {
+      const path=`invoices/${pending}/actions`;
+      const request=new Request(`http://localhost:3000/api/v1/${path}`,{method:'POST',headers:{origin:'http://localhost:3000','Content-Type':'application/json','X-LoopLedger-CSRF':'1',cookie},body:JSON.stringify({action:'send'})});
+      // Requeue only a known failed state for this delivery test.
+      await fixture.db.query("UPDATE outbox_messages SET delivery_state='FAILED',next_attempt_at=now(),sent_at=NULL WHERE dedupe_key=$1",[`invoice:${pending}`]);
+      const response=await handle(request,path.split('/'),{defer:task=>tasks.push(task),dispatch:key=>deliverOutbox(async()=>{sends++;},1,key)});
+      expect(response.status).toBe(200);expect(tasks).toHaveLength(1);expect(sends).toBe(0);
+      await tasks[0]();expect(sends).toBe(1);
+      expect((await fixture.db.query('SELECT delivery_state FROM outbox_messages WHERE dedupe_key=$1',[`invoice:${pending}`])).rows[0].delivery_state).toBe('SENT');
+    } finally {vi.unstubAllEnvs();}
+  });
   it('keeps draft list reads bounded as page size grows, using joined plan policies',async()=>{
     await fixture.db.query(`INSERT INTO subscriptions(id,number,customer_id,plan_id,status,start_date,payment_terms_days)
       SELECT 'pageperf_'||n,'PAGEPERF-'||n,$1,$2,'DRAFT','2026-11-01',14 FROM generate_series(1,20) n`,[customer.id,plan.id]);

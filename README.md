@@ -99,3 +99,5 @@ To use the implemented endpoints, set `NEXT_PUBLIC_DATA_MODE=http`, configure th
 The team leader submits the public repository before the portal's 10:00 AM deadline on the applicable round date, selects the problem, adds the actual evaluator as collaborator, follows Discord/timeline announcements, and submits an open-access functional video after coding (maximum 5-6 minutes). Repository setup does not itself complete portal submission or the evaluator invite.
 
 Do not commit `.env.local`, real credentials, user data, build outputs, reference PDFs, or demo recordings.
+
+For Vercel Hobby/Neon preparation, see [provider compatibility](docs/VERCEL_NEON.md). Browser QA expects an installed Playwright module (PLAYWRIGHT_MODULE_PATH) and Chromium (CHROMIUM_PATH); the selected cloud environment provided these, but they are not runtime app dependencies. The local demo seed deliberately refuses remote databases.

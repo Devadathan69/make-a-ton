@@ -20,9 +20,11 @@
     "db:seed": "node scripts/seed.mjs",
     "db:seed:performance": "node scripts/seed.mjs --performance",
     "benchmark": "node scripts/benchmark.mjs",
-    "qa:browser": "node scripts/browser-qa.mjs"
+    "qa:browser": "node scripts/browser-qa.mjs",
+    "billing:catchup": "node scripts/catchup.mjs"
   },
   "dependencies": {
+    "@vercel/functions": "3.10.5",
     "next": "16.4.3",
     "nodemailer": "^10.3.1",
     "pg": "8.23.1",
