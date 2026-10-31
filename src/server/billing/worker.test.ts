@@ -8,7 +8,7 @@ describe.skipIf(!process.env.DB_TEST_URL)('transactional recurring billing',()=>
   const p={name:'Monthly',price:0,interval:'MONTHLY',autoClose:true,allowEarlyClose:true,allowPause:true,allowRenew:true,taxes:[]};
   beforeAll(async()=>{fixture=await isolatedDatabase();});afterAll(async()=>fixture.close());
   beforeEach(async()=>{
-    await fixture.db.query('TRUNCATE customers,products,plans,discounts,subscriptions,invoices,billing_runs CASCADE');
+    await fixture.db.query('TRUNCATE outbox_messages,customers,products,plans,discounts,subscriptions,invoices,billing_runs CASCADE');
     await fixture.db.query("INSERT INTO customers(id,name,email,company) VALUES('c','Demo','demo@example.test','Demo'); INSERT INTO products(id,name,type,sales_price,cost_price) VALUES('p','Workspace','SOFTWARE',100000,0); INSERT INTO plans(id,name,price,interval,minimum_quantity,available_from) VALUES('plan','Monthly',0,'MONTHLY',1,'2020-01-01')");
   });
   async function subscription(id:string,interval:BillingInterval='MONTHLY',start='2026-01-31',expiry:string|null=null,status='ACTIVE',autoClose=true) {
@@ -33,11 +33,11 @@ describe.skipIf(!process.env.DB_TEST_URL)('transactional recurring billing',()=>
   });
   it('rolls back invoice, usage and due date after failure, then retries successfully',async()=>{
     await subscription('s');await discount();
-    await fixture.db.query("CREATE FUNCTION fail_line() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$; CREATE TRIGGER inject_failure BEFORE INSERT ON invoice_lines FOR EACH ROW EXECUTE FUNCTION fail_line()");
+    await fixture.db.query("CREATE FUNCTION fail_line() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$; CREATE TRIGGER inject_failure BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_line()");
     const failed=await runDueBilling('2026-01-31');expect(failed.failed).toBe(1);expect(failed.generated).toBe(0);
     expect((await fixture.db.query('SELECT count(*) FROM invoices')).rows[0].count).toBe('0');expect((await fixture.db.query('SELECT usage_count FROM discounts')).rows[0].usage_count).toBe(0);
     expect((await fixture.db.query('SELECT next_billing_date::text FROM subscriptions')).rows[0].next_billing_date).toBe('2026-01-31');
-    await fixture.db.query('DROP TRIGGER inject_failure ON invoice_lines; DROP FUNCTION fail_line()');
+    await fixture.db.query('DROP TRIGGER inject_failure ON audit_events; DROP FUNCTION fail_line()');
     expect((await runDueBilling('2026-01-31')).generated).toBe(1);expect((await fixture.db.query('SELECT resolved_at FROM billing_failures')).rows[0].resolved_at).not.toBe(null);
   });
   it('activates future confirmed contracts only when due, then closes or pauses at expiry without skipping catch-up',async()=>{

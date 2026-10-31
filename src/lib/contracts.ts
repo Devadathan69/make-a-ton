@@ -60,6 +60,8 @@ export interface InvoiceLine {
   subtotal: number; discount: number; tax: number; total: number;
 }
 export interface Invoice extends Entity {
+  /** SENT means SMTP accepted; final mailbox delivery is not guaranteed. */
+  emailStatus?: "QUEUED" | "SENT" | "FAILED" | "UNCERTAIN"; emailError?: string | null;
   number: string; subscriptionId: string; customerId: string; customerName: string;
   status: InvoiceStatus; issuedAt: string; dueAt: string; periodStart: string; periodEnd: string;
   subtotal: number; discount: number; tax: number; total: number; paid: number;

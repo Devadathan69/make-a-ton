@@ -54,3 +54,12 @@ SMTP delivery, hosted scheduler, deployment performance, evaluator invitation an
 - Expiry is processed against the next unissued period, preserving historical catch-up; auto-close or pause follows the snapshotted plan policy.
 - Failed periods roll back, remain due and receive separate retryable failure records; successful retry resolves the failure.
 - Scheduler endpoint requires a separate server credential and a one-minute rate guard. Hosted scheduling remains unconfigured/unverified; manual runs do not satisfy that deployment gate.
+
+## D7 invoice actions, documents and outbox
+
+- Invoice list/detail derives current balance/overdue and validates line/header reconciliation. Confirm/cancel/send enforce state and permissions; cancellation releases each redemption once and retains the period record.
+- Printable HTML uses stored customer/line/economic snapshots, escapes all text and has a restrictive CSP. Customer direct-document/detail and portal lookups are owner-scoped.
+- Invoice email is deduplicated by invoice ID. Outbox records commit atomically with invoices; external SMTP processing occurs after that commit, so SMTP failure does not undo billing. Reset payloads remain encrypted until sent and are then cleared.
+- Nodemailer transport requires TLS and explicit EMAIL_DELIVERY_ENABLED opt-in. Delivery status is optional compatible Invoice.emailStatus/emailError; SENT means SMTP acceptance, not confirmed mailbox delivery.
+- Failed sends are visible/retryable. Ambiguous DATA acceptance is UNCERTAIN and requires explicit reconciliation before retry. SMTP cannot promise exactly-once external delivery across a process/database crash after acceptance; stable Message-ID aids reconciliation.
+- Connected tests inject a local sender; no real external email was sent. Actual SMTP acceptance/reset/invoice email remains a deployment gate.
