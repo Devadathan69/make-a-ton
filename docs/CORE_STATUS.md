@@ -15,3 +15,12 @@ Branch: `feat/devadathan-core`. No teammate-owned files changed.
 
 D2-D9 remain in progress: real auth/permissions, domain APIs, lifecycle/snapshots, billing, documents/outbox, payments/reports, clock, deployment/integration.
 SMTP delivery, hosted scheduler, deployment performance, evaluator invitation and contest submission require verified setup. No external account credentials were provisioned, emails sent, or deployment published.
+
+## D2 authentication increment
+
+- Transactional customer signup; database email uniqueness; exact minimum-nine-character password policy; salted Node scrypt.
+- Hashed opaque sessions, HttpOnly/SameSite cookies, HTTPS Secure flag, expiry/logout, origin plus custom-header CSRF checks, database-backed throttles.
+- Reset tokens are hashed, expire after 30 minutes, single use; reset revokes all sessions and sibling tokens. Reset email outbox payload is encrypted with a separately configured key; tokens are carried in URL fragments and are not returned by the API.
+- Login/register/forgot/reset screens, admin-only staff provisioning, protected internal/portal layouts. Session loading hides internal navigation; customer shell only shows portal.
+- Connected negative tests cover role injection, duplicate case-variant signup rollback, nine/eight-character boundary, invalid/used/expired resets, expired/logout sessions, CSRF and admin/staff denial.
+- SMTP transmission is still unverified and not yet wired; queueing is not delivery. Missing reset encryption configuration returns a visible 503.
