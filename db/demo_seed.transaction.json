@@ -1,0 +1,37 @@
+{
+  "targetDatabase": "loopledger_demo",
+  "requiresVerifiedSchema": "001-005",
+  "passwordHashSqlLiteralMarkers": {
+    "user_admin": "__APPROVED_ADMIN_SCRYPT_HASH_SQL_LITERAL__",
+    "user_staff": "__APPROVED_STAFF_SCRYPT_HASH_SQL_LITERAL__",
+    "user_maple": "__APPROVED_MAPLE_SCRYPT_HASH_SQL_LITERAL__",
+    "user_north": "__APPROVED_NORTH_SCRYPT_HASH_SQL_LITERAL__"
+  },
+  "statements": [
+    "DO $target$ BEGIN IF current_database() <> 'loopledger_demo' THEN RAISE EXCEPTION 'Only the approved isolated loopledger_demo database is allowed'; END IF; END $target$;",
+    "SELECT set_config('loopledger.demo_hash_admin', __APPROVED_ADMIN_SCRYPT_HASH_SQL_LITERAL__, true);",
+    "SELECT set_config('loopledger.demo_hash_staff', __APPROVED_STAFF_SCRYPT_HASH_SQL_LITERAL__, true);",
+    "SELECT set_config('loopledger.demo_hash_maple', __APPROVED_MAPLE_SCRYPT_HASH_SQL_LITERAL__, true);",
+    "SELECT set_config('loopledger.demo_hash_north', __APPROVED_NORTH_SCRYPT_HASH_SQL_LITERAL__, true);",
+    "DO $credential$ DECLARE config_key text; BEGIN FOREACH config_key IN ARRAY ARRAY['loopledger.demo_hash_admin','loopledger.demo_hash_staff','loopledger.demo_hash_maple','loopledger.demo_hash_north'] LOOP IF split_part(current_setting(config_key),'$',1) <> 'scrypt' OR split_part(current_setting(config_key),'$',2) !~ '^[0-9a-f]{32}$' OR split_part(current_setting(config_key),'$',3) !~ '^[0-9a-f]{128}$' THEN RAISE EXCEPTION 'Supply approved salted scrypt hashes'; END IF; END LOOP; END $credential$;",
+    "SELECT pg_advisory_xact_lock(809032);",
+    "INSERT INTO customers (id,name,email,company,address,created_at,updated_at) VALUES ('customer_maple','Ananya Rao','ananya@example.test','Maple Studio','Kochi, Kerala','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO users (id,name,email,password_hash,role,customer_id,created_at,updated_at) VALUES ('user_maple','Ananya Rao','ananya@example.test',current_setting('loopledger.demo_hash_maple'),'CUSTOMER','customer_maple','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO customers (id,name,email,company,address,created_at,updated_at) VALUES ('customer_north','Arjun Menon','arjun@example.test','Northstar Labs','Kochi, Kerala','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO users (id,name,email,password_hash,role,customer_id,created_at,updated_at) VALUES ('user_north','Arjun Menon','arjun@example.test',current_setting('loopledger.demo_hash_north'),'CUSTOMER','customer_north','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES ('user_admin','Demo ADMIN','admin@example.test',current_setting('loopledger.demo_hash_admin'),'ADMIN','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES ('user_staff','Demo STAFF','staff@example.test',current_setting('loopledger.demo_hash_staff'),'STAFF','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO products (id,name,type,sales_price,cost_price,notes,created_at,updated_at) VALUES ('prod_workspace','Workspace Suite','SOFTWARE',100000,35000,'Per seat, per billing cycle','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO product_variants (id,product_id,name,price_adjustment) VALUES ('variant_odoo','prod_workspace','Odoo',56000) ON CONFLICT DO NOTHING;",
+    "INSERT INTO taxes (id,name,rate_bps,created_at,updated_at) VALUES ('tax_demo','Demo tax (illustrative)',1000,'2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO plans (id,name,price,interval,minimum_quantity,available_from,allow_pause,allow_renew,created_at,updated_at) VALUES ('plan_monthly','Business Monthly',0,'MONTHLY',1,'2026-01-01',true,true,'2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO discounts (id,name,kind,value,scope,minimum_quantity,starts_at,ends_at,usage_limit,created_at,updated_at) VALUES ('discount_seats','Team launch offer','PERCENTAGE',1000,'SUBSCRIPTION',10,'2026-10-01','2026-10-31',100,'2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO quotation_templates (id,name,plan_id,valid_days,lines,created_at,updated_at) VALUES ('template_team','10-seat team starter','plan_monthly',14,'[{\"productId\":\"prod_workspace\",\"variantId\":null,\"quantity\":10,\"taxIds\":[\"tax_demo\"]}]','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO subscriptions (id,number,customer_id,plan_id,status,start_date,expiry_date,next_billing_date,billing_anchor_day,cycle_anchor,payment_terms_days,plan_snapshot,created_at,updated_at) VALUES ('sub_maple','SUB-DEMO-0001','customer_maple','plan_monthly','ACTIVE','2026-10-01','2027-10-01','2026-11-01',1,'2026-10-01',14,'{\"name\":\"Business Monthly\",\"price\":0,\"interval\":\"MONTHLY\",\"autoClose\":true,\"allowEarlyClose\":true,\"allowPause\":true,\"allowRenew\":true,\"taxes\":[]}','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO subscription_lines (id,subscription_id,product_id,variant_id,description,quantity,unit_price,tax_ids,tax_snapshot) VALUES ('sl_1','sub_maple','prod_workspace',NULL,'Workspace Suite',10,100000,'[\"tax_demo\"]','[{\"id\":\"tax_demo\",\"name\":\"Demo tax (illustrative)\",\"rateBps\":1000}]') ON CONFLICT DO NOTHING;",
+    "INSERT INTO invoices (id,number,subscription_id,customer_id,customer_snapshot,status,issued_at,due_at,period_start,period_end,subtotal,discount,tax,total,paid,explanation,created_at,updated_at) VALUES ('inv_maple','INV-DEMO-0001','sub_maple','customer_maple','{\"name\":\"Ananya Rao\",\"email\":\"ananya@example.test\",\"company\":\"Maple Studio\",\"address\":\"Kochi, Kerala\"}','CONFIRMED','2026-10-01','2026-10-15','2026-10-01','2026-11-01',1000000,100000,90000,990000,400000,'[\"10 × 100000 paise = 1000000 paise\",\"Team launch offer: 100000 paise discount\",\"Illustrative tax: 90000 paise\"]','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "INSERT INTO invoice_lines (id,invoice_id,description,quantity,unit_price,subtotal,discount,tax,total,pricing_snapshot) VALUES ('il_1','inv_maple','Workspace Suite',10,100000,1000000,100000,90000,990000,'{\"taxes\":[{\"id\":\"tax_demo\",\"name\":\"Demo tax (illustrative)\",\"rateBps\":1000}]}') ON CONFLICT DO NOTHING;",
+    "INSERT INTO payments (id,invoice_id,amount,method,paid_at,note,idempotency_key,created_by,created_at,updated_at) VALUES ('payment_maple','inv_maple',400000,'BANK_TRANSFER','2026-10-12','Fictitious first instalment','seed-maple-payment','user_admin','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z') ON CONFLICT DO NOTHING;",
+    "WITH added AS (INSERT INTO discount_redemptions(discount_id,invoice_id) VALUES ('discount_seats','inv_maple') ON CONFLICT DO NOTHING RETURNING discount_id) UPDATE discounts SET usage_count=usage_count+1 WHERE id IN (SELECT discount_id FROM added);"
+  ]
+}

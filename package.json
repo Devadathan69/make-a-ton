@@ -21,7 +21,10 @@
     "db:seed:performance": "node scripts/seed.mjs --performance",
     "benchmark": "node scripts/benchmark.mjs",
     "qa:browser": "node scripts/browser-qa.mjs",
-    "billing:catchup": "node scripts/catchup.mjs"
+    "billing:catchup": "node scripts/catchup.mjs",
+    "qa:integration": "node scripts/demo-qa.mjs",
+    "demo:bootstrap": "node scripts/bootstrap-demo.mjs",
+    "deploy:manifest": "node scripts/deploy-manifest.mjs"
   },
   "dependencies": {
     "@vercel/functions": "3.10.5",

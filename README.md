@@ -4,7 +4,7 @@ Subscription operations for Brightloop Software, built for **Odoo x Make-A-Ton 9
 
 ## Start here
 
-The core now includes PostgreSQL repositories/migrations, authenticated customer/staff/admin roles, catalog and subscription APIs, immutable contract snapshots, exact recurring billing, invoice actions/documents, a guarded SMTP outbox, idempotent payments, live reports and isolated demo controls. **This is not yet the finished hackathon submission:** teammate feature interfaces, approved public deployment, real SMTP/scheduler verification and contest delivery gates remain. See [core evidence](docs/CORE_STATUS.md) and [connected deployment setup](docs/DEPLOYMENT.md).
+The connected application includes authenticated roles, catalog and quotation forms, subscription lifecycle controls, recurring invoices, exact calculations, printable documents, idempotent payment recording, reports and a customer portal. For the functional demo use [local/hosted run instructions](docs/LOCAL_DEMO.md) and the [5:25 recording script](docs/DEMO_RECORDING.md). Public deployment, actual SMTP/scheduler verification and contest delivery gates remain separately tracked in [core evidence](docs/CORE_STATUS.md).
 
 ### Run the starter (no accounts or database needed)
 
@@ -82,21 +82,15 @@ Money DTOs use integer paise; percentage rates use basis points. Plan fees are o
 
 Verification now includes real PostgreSQL 17 migration/rerun/rollback and connected auth/domain/billing/payment concurrency checks, strict types, lint and HTTP production build. Local Chromium and 5,000-record measurements are recorded in the core status; they do not establish hosted performance or email delivery.
 
-## Optional database setup (Devadathan)
+## Connected database setup
 
-```powershell
-docker compose up -d db
-# .env.local already contains the local development DATABASE_URL example.
-npm run db:migrate
-```
+Follow [LOCAL_DEMO.md](docs/LOCAL_DEMO.md) for the exact private environment, isolated Docker/PostgreSQL, migration and synthetic seed steps. Compose now requires a privately supplied POSTGRES_PASSWORD and binds only loopback. A prepared hosted URL is the preferred recording fallback if the teammate cannot run PostgreSQL.
 
-The local container uses development-only credentials and a persistent named volume. Managed PostgreSQL works too. Migration checksums protect already applied SQL. No real DB, auth, email, or scheduler is required for feature UI development.
-
-To use the implemented endpoints, set `NEXT_PUBLIC_DATA_MODE=http`, configure the private runtime settings described in docs/DEPLOYMENT.md, migrate PostgreSQL and restart/rebuild. `npm start` runs the standalone build and binds loopback by default (`APP_HOST` controls intentional host binding). HTTP mode never falls back to fixtures. Do not deploy the mock preview as the completed application.
+Set NEXT_PUBLIC_DATA_MODE=http at build and runtime; configure private DATABASE_URL and exact APP_URL. HTTP failures never fall back to fixtures. The local seed remains loopback-only; the parent-approved hosted synthetic bootstrap has a separate exact-host/database guard. No account creation or migrations run during a Vercel build.
 
 ## Submission reminders
 
-The team leader submits the public repository before the portal's 10:00 AM deadline on the applicable round date, selects the problem, adds the actual evaluator as collaborator, follows Discord/timeline announcements, and submits an open-access functional video after coding (maximum 5-6 minutes). Repository setup does not itself complete portal submission or the evaluator invite.
+The user-confirmed delivery deadline is 2026-10-31 17:00 Asia/Kolkata (11:30 UTC). The team leader must still verify the portal's separate repository/problem/evaluator/video steps and any earlier checkpoint deadlines. Submit the open-access functional video within the actual portal limits (target 5:25).  Repository setup does not itself complete portal submission or the evaluator invite.
 
 Do not commit `.env.local`, real credentials, user data, build outputs, reference PDFs, or demo recordings.
 

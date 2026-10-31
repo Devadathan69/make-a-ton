@@ -11,10 +11,9 @@ Branch: `feat/devadathan-core`. No teammate-owned files changed.
 - Separate `npm run db:seed:performance` adds 5,000 subscriptions. Requires a loopback database whose name contains demo/test, `ENABLE_DEMO_SEED=true`, and a compliant `DEMO_PASSWORD` supplied privately through the environment.
 - Run connected tests with `DB_TEST_URL` pointing at a disposable PostgreSQL instance. Migration tests use an isolated temporary schema.
 
-## Remaining gates
+## Current delivery gates
 
-Core D1-D8 services and the D9 local clock/admin/deployment preparation are implemented below. Real SMTP acceptance, hosted scheduling, public deployment, teammate UI integration and deployed performance remain open gates.
-SMTP delivery, hosted scheduler, deployment performance, evaluator invitation and contest submission require verified setup. No external account credentials were provisioned, emails sent, or deployment published.
+The integrated UI now covers catalog, customers/templates, quotation lifecycle, subscriptions/portal, invoice actions/documents, received-payment recording and filtered reporting. Teammate commits remain attributed to their actual authors. Public HTTPS verification, actual SMTP acceptance/reset email, hosted scheduling and deployed p95 remain parent-owned verification gates. Video recording, evaluator invitation and contest submission have not been performed by this child.
 
 ## D2 authentication increment
 
@@ -123,3 +122,18 @@ No feature-owner PRs were open at the last review. Their unfinished UI is an exp
 - Final provider review: creation-date filters use explicit Asia/Kolkata midnight bounds without session timezone state; a connected four-record UTC/IST boundary test passes. Schema-isolated test URLs also reject known poolers. Current full check passes 63 tests; private external setup is still parent-owned.
 
 - Money display preserves every paise up to Number.MAX_SAFE_INTEGER, including negative subrupee values, without dividing through a floating-point rupee amount. Full HTTP check now passes 64 tests across 12 files, lint, strict types and production build. The pre-format-change Chromium run at 06e7a0c passed all 13 role/clock/validation/mobile scenarios; final-run artifacts are emitted under ignored output/browser and output/local-benchmark.json with their source commit/tree identifiers.
+
+## Authorized UI integration and recording handoff (2026-10-31)
+
+- Integration PR #14 preserves Athul catalog commit 6e05566, Hannath's five subscription/portal commits ending 03eb20e, and Adrinath dashboard/finance commits c2c5ab6 and c1b55c3. The user explicitly authorized teammate-file corrections and missing-feature completion. Devadathan authored the corrective work and remaining invoice/payment UI; no teammate authorship was fabricated.
+- Corrected modal focus and restoration, selector-error visibility/retry, template edit loss, saved-draft retry, repeated quotation transitions, stale object actions/previews, keyboard form access, portal pagination and mobile tabs. Existing route exports remain unchanged.
+- Finance invoice detail uses server explanations and totals, state-aware confirm/cancel/send, protected printable HTML and a received-payment form. Unknown payment outcomes lock the attempt for an identical retry, even after a background refresh observes settlement. History/search/date pagination and live filtered dashboard reads use the shared facade.
+- Compatible optional third transition argument {startDate} enables CLOSED renewal with an explicit future cycle. Server policy, ownership and current plan availability are enforced; missing/past dates fail. Existing two-argument calls remain valid. Portal/internal forms collect that date and explain fresh-cycle/no-refund policy.
+- Full HTTP lint/types/test/build passes with 118 tests across 20 files. Connected PostgreSQL migration plus seed and rerun pass on new isolated loopback databases. Local seed guard remains loopback-only. A separate exact-host/operator-approved hosted bootstrap is prepared but has not been executed remotely by this child.
+- Connected Chromium regression passes 19 checks: typing/variant persistence; selector outage; exact tax entry; customer persistence; failed quotation creation stage with saved-draft retry; independent template edits; quotation PATCH without a repeated transition; confirm/activate/preview; failed second detail without old actions; real/repeated billing; partial and final payments with deliberately lost responses and background settlement refresh; authorized documents; truthful queued email; filtered zero reports/current balances; next-cycle discount expiry; portal pause/resume/closed renewal; A/B isolation; staff denial; 390px key pages. No browser runtime errors. Fresh fictitious local PostgreSQL, SMTP disabled; no external email was sent. Final source-specific evidence is generated in ignored output/demo-qa.
+- docs/LOCAL_DEMO.md gives clean-checkout Node 24, private environment names, guarded Docker/native PostgreSQL and hosted operator steps. docs/DEMO_RECORDING.md is the <=5:25 functional recording plan. npm run deploy:manifest produces a clean-checkout source manifest without .env/dependencies/output.
+- Historical earlier sections record intermediate gates; the implemented UI work in this section supersedes their former missing-screen lists. Hosting/SMTP/scheduler/video gates still require actual verification.
+
+- Late finance integration retains Adrinath's invoice/history layouts and CSS; invoice and payment modals delegate to the tested shared feature implementations. Overdue and method filters now run on the server before pagination, and default report presets use the simulated server date. Both finance commits remain in merge ancestry.
+
+- Hosted seed handoff: db/demo_seed.template.sql and db/demo_seed.transaction.json are generated from the same non-destructive seed implementation. They contain a non-executable hash-literal marker, actual-database/hash-format guards and no credentials. SQL template rerun was proved on loopback: four users, one invoice, one redemption; parent alone substitutes the approved private hash and executes on the approved Neon target. No remote seed was run by this child.

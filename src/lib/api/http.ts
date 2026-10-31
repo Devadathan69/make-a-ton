@@ -61,7 +61,7 @@ export function createHttpApi(): AppApi {
     discounts: crud("/discounts"), customers: crud("/customers"), templates: crud("/templates"),
     subscriptions: {
       ...crud("/subscriptions"),
-      transition: (id, action) => request(`/subscriptions/${encodeURIComponent(id)}/transition`, "POST", { action }),
+      transition: (id, action, options) => request(`/subscriptions/${encodeURIComponent(id)}/transition`, "POST", { action, ...options }),
       preview: (id) => request(`/subscriptions/${encodeURIComponent(id)}/preview`),
     },
     invoices: {
@@ -88,7 +88,7 @@ export function createHttpApi(): AppApi {
     portal: {
       subscriptions: (query) => request(`/portal/subscriptions${queryString(query)}`),
       invoices: (query) => request(`/portal/invoices${queryString(query)}`),
-      transition: (id, action) => request(`/portal/subscriptions/${encodeURIComponent(id)}/transition`, "POST", { action }),
+      transition: (id, action, options) => request(`/portal/subscriptions/${encodeURIComponent(id)}/transition`, "POST", { action, ...options }),
     },
     billing: {
       run: () => request("/billing/run", "POST"),

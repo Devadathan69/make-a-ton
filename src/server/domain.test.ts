@@ -246,4 +246,15 @@ describe.skipIf(!process.env.DB_TEST_URL)('connected domain workflow',()=>{
     } finally {queries.mockRestore();}
   });
 
+  it('renews a closed contract only with an explicit available future cycle',async()=>{
+    const asOf=(await (await call('system/status')).json()).asOf;
+    const future=new Date(`${asOf}T00:00:00Z`);future.setUTCDate(future.getUTCDate()+2);const startDate=future.toISOString().slice(0,10);
+    const sub:Subscription=await create('subscriptions',{customerId:customer.id,planId:plan.id,startDate:asOf,expiryDate:null,paymentTermsDays:14,quotationValidUntil:startDate,lines:template.lines});
+    for(const action of ['quote','confirm','close'])expect((await call(`subscriptions/${sub.id}/transition`,'POST',{action})).status).toBe(200);
+    expect((await (await call(`subscriptions/${sub.id}`)).json()).allowedActions).toContain('renew');
+    expect((await call(`subscriptions/${sub.id}/transition`,'POST',{action:'renew'})).status).toBe(422);
+    expect((await call(`subscriptions/${sub.id}/transition`,'POST',{action:'renew',startDate:asOf})).status).toBe(422);
+    const response=await call(`subscriptions/${sub.id}/transition`,'POST',{action:'renew',startDate});expect(response.status).toBe(200);const renewed=await response.json();expect(renewed.status).toBe('CONFIRMED');expect(renewed.startDate).toBe(startDate);expect(renewed.expiryDate>startDate).toBe(true);
+  });
+
 });
